@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+# Build and Run
+
+Preferred flow is Docker-only. Avoid npm helper scripts.
+
+- Build multi-stage image:
+  - `docker build -t alexschladetsch/cone-counter:latest .`
+- Run (production):
+  - `docker-compose up -d`
+  - Or: `docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest`
+- Image serves:
+  - API: `http://<host>:3000/api/*`
+  - Frontend: `http://<host>:3000/`
+- Healthcheck: `GET /api/stats` returns 200 when up
+- Persistent data is stored at `/app/data` inside container (SQLite file `cones.db`).

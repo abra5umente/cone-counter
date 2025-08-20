@@ -1,0 +1,18 @@
+---
+globs: *.ts,*.tsx
+---
+# Coding Conventions
+
+- Prefer explicit function and API types; avoid `any` except in narrow interop (e.g., Express error middleware)
+- Use descriptive names (no 1-2 letter identifiers). Favor readability over terseness
+- React:
+  - Functional components only; hooks for state/effects
+  - Keep UI components pure; side-effects in hooks
+  - Use Tailwind utility classes; support dark mode via `dark:` modifiers
+- Server:
+  - Keep middleware minimal; CORS is permissive
+  - Serve frontend from `frontend/build` with `express.static`
+  - Compute stats in DB layer; keep route handlers thin
+- Dates:
+  - Persist ISO timestamp; derive `date`, `time`, `dayOfWeek`
+  - Week starts Monday; averages based on first data date to today

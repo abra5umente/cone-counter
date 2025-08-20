@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+# Project Structure Guide
+
+- Backend entry point: [`src/server.ts`](mdc:src/server.ts)
+  - Express app serving API under `/api/*` and static frontend from `frontend/build`
+  - CORS is permissive; no Helmet headers
+  - Port from `PORT` env (default 3000)
+- Database: [`src/database.ts`](mdc:src/database.ts)
+  - SQLite database file at `data/cones.db`
+  - Tables: `cones` with indices on `timestamp`, `date`, `dayOfWeek`
+  - Provides CRUD, stats, and analysis helpers
+- Shared types: [`src/types.ts`](mdc:src/types.ts)
+- Frontend root: [`frontend/src/index.tsx`](mdc:frontend/src/index.tsx)
+  - App shell: [`frontend/src/App.tsx`](mdc:frontend/src/App.tsx)
+  - Components under `frontend/src/components`
+  - API client: [`frontend/src/api.ts`](mdc:frontend/src/api.ts)
+- Frontend build and static assets:
+  - Tailwind config: [`frontend/tailwind.config.js`](mdc:frontend/tailwind.config.js)
+  - PWA manifest: [`frontend/public/manifest.json`](mdc:frontend/public/manifest.json)
+  - Service worker: [`frontend/public/service-worker.js`](mdc:frontend/public/service-worker.js)
+- Containerization:
+  - Dockerfile builds frontend and backend, runs Node server
+  - Compose file runs published image and mounts volume `cone-data` to `/app/data`
+
+Notes
+- All time fields are stored as ISO strings; derived `date`, `time`, `dayOfWeek` are persisted for fast grouping.
+- Static frontend is served by the same Node process for single-container deploys.

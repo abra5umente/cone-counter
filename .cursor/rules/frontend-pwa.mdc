@@ -1,0 +1,14 @@
+---
+alwaysApply: false
+---
+# Frontend PWA & Theme
+
+- PWA
+  - Manifest at [`frontend/public/manifest.json`](mdc:frontend/public/manifest.json)
+  - Service worker at [`frontend/public/service-worker.js`](mdc:frontend/public/service-worker.js)
+  - Registered in [`frontend/src/index.tsx`](mdc:frontend/src/index.tsx)
+  - Cache strategy: cache-first for shell, network-first for `/api/*`
+- Theme
+  - Tailwind `darkMode: 'class'`
+  - Root toggled via `document.documentElement.classList`
+  - Persist preference in `localStorage['theme']` ('dark'|'light')
