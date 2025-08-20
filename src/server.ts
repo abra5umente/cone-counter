@@ -10,6 +10,17 @@ const PORT = process.env.PORT || 3000;
 
 // Initialize database
 const db = new Database();
+// On startup, normalize any existing rows that may have UTC-shifted dates
+(async () => {
+	try {
+		const updated = await db.normalizeDateFields();
+		if (updated > 0) {
+			console.log(`Normalized date fields for ${updated} existing cone(s)`);
+		}
+	} catch (e) {
+		console.warn('Date normalization skipped due to error:', e);
+	}
+})();
 
 // Middleware (no security headers; allow wide-open CORS for simplicity)
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'] }));
@@ -17,11 +28,14 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 
-// Utility function to format date and time
+// Utility function to format date and time (consistently using LOCAL time)
 function formatDateTime(date: Date) {
+	const pad2 = (n: number) => String(n).padStart(2, '0');
 	const timestamp = date.toISOString();
-	const dateStr = date.toISOString().split('T')[0];
-	const timeStr = date.toTimeString().split(' ')[0];
+	// Build local date string YYYY-MM-DD to avoid UTC shifting the day
+	const dateStr = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+	// Keep local time component HH:MM:SS
+	const timeStr = `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 	const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	const dayOfWeek = days[date.getDay()];
 	

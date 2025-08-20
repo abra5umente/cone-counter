@@ -9,8 +9,9 @@ A web application for tracking and analyzing bong/cone usage over time. Built wi
 - **✏️ Edit & Manage**: Modify existing entries with timestamps and notes
 - **💾 Persistent Storage**: SQLite database with automatic data persistence
 - **📤 Export/Import**: Backup and restore your data with JSON files
-- **🎨 Modern UI**: Beautiful, responsive interface built with Tailwind CSS
+- **🎨 Modern UI**: Beautiful, responsive interface built with Tailwind CSS with dark mode support
 - **🐳 Docker Ready**: Single container deployment with multi-arch support
+- **🌍 Timezone Aware**: Consistent local time handling across all displays and statistics
 
 ## 🚀 Quick Start
 
@@ -24,14 +25,15 @@ A web application for tracking and analyzing bong/cone usage over time. Built wi
 2. **Or build and run manually:**
    ```bash
    # Build the image
-   docker build -t alexschladetsch/cone-counter .
+   docker build -t alexschladetsch/cone-counter:latest .
    
    # Run the container
-   docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter
+   docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
    ```
 
 3. **Access the application:**
    - Open your browser and navigate to `http://localhost:3000`
+   - Health check: `http://localhost:3000/api/stats`
 
 ### Multi-Architecture Build
 
@@ -50,7 +52,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
 ### Prerequisites
 
 - Node.js 18+ 
-- npm or yarn
+- Docker and Docker Compose
 - Git
 
 ### Local Development
@@ -63,19 +65,29 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
 
 2. **Install dependencies:**
    ```bash
-   npm run install:all
+   # Backend dependencies
+   npm install
+   
+   # Frontend dependencies
+   cd frontend && npm install
    ```
 
 3. **Start development servers:**
    ```bash
+   # Terminal 1: Backend
    npm run dev
+   
+   # Terminal 2: Frontend
+   cd frontend && npm start
    ```
-
-   This will start both the backend (port 3000) and frontend (port 3001) in development mode.
 
 4. **Build for production:**
    ```bash
-   npm run build
+   # Build frontend
+   cd frontend && npm run build
+   
+   # Build Docker image
+   docker build -t alexschladetsch/cone-counter:latest .
    ```
 
 ## 📁 Project Structure
@@ -83,12 +95,15 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
 ```
 cone-counter/
 ├── src/                    # Backend TypeScript source
-│   ├── database.ts        # Database operations
-│   ├── server.ts          # Express server
-│   └── types.ts           # TypeScript interfaces
+│   ├── database.ts        # Database operations and SQLite schema
+│   ├── server.ts          # Express server with API endpoints
+│   └── types.ts           # TypeScript interfaces and types
 ├── frontend/              # React frontend
-│   ├── src/               # React components
-│   ├── public/            # Static assets
+│   ├── src/               # React components and hooks
+│   │   ├── components/    # UI components (AddConeModal, ConeList, etc.)
+│   │   ├── api.ts         # API client functions
+│   │   └── types.ts       # Frontend type definitions
+│   ├── public/            # Static assets and PWA manifest
 │   └── package.json       # Frontend dependencies
 ├── Dockerfile             # Multi-stage Docker build
 ├── docker-compose.yml     # Local development setup
@@ -105,6 +120,11 @@ cone-counter/
 ### Database
 
 The application uses SQLite for data storage, automatically created in the `/app/data` directory within the container. Data is persisted using Docker volumes.
+
+**Database Schema:**
+- `cones` table with fields: `id`, `timestamp` (ISO), `date` (YYYY-MM-DD), `time` (HH:MM:SS), `dayOfWeek`, `notes`, `createdAt`, `updatedAt`
+- Automatic indexing on `timestamp`, `date`, and `dayOfWeek` for performance
+- Startup normalization ensures all derived date fields match local time
 
 ## 📊 API Endpoints
 
@@ -128,7 +148,7 @@ The application uses SQLite for data storage, automatically created in the `/app
 
 ### Adding a Cone
 1. Click the "Add Cone" button in the header
-2. Optionally set a custom timestamp (defaults to current time)
+2. Optionally set a custom timestamp (defaults to current local time)
 3. Add optional notes
 4. Click "Add Cone"
 
@@ -149,18 +169,28 @@ The application uses SQLite for data storage, automatically created in the `/app
 2. **Export**: Download your data as a JSON file
 3. **Import**: Upload a previously exported file (replaces all data)
 
+## 🌍 Timezone Handling
+
+The application ensures consistent local time display:
+
+- **Storage**: All timestamps stored as ISO strings in UTC
+- **Display**: Dates and times shown in local timezone
+- **Derived Fields**: `date`, `time`, and `dayOfWeek` computed from local time
+- **Startup Normalization**: Existing data automatically corrected on container restart
+- **Statistics**: All calculations use local dates to prevent timezone-related discrepancies
+
 ## 🐳 Docker Commands
 
 ### Build and Run
 ```bash
 # Build the image
-docker build -t cone-counter .
+docker build -t alexschladetsch/cone-counter:latest .
 
 # Run with port mapping and volume
-docker run -d -p 3000:3000 -v cone-data:/app/data cone-counter
+docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
 
 # Run in background
-docker run -d --name cone-counter -p 3000:3000 -v cone-data:/app/data cone-counter
+docker run -d --name cone-counter -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
 ```
 
 ### Management
@@ -192,10 +222,9 @@ docker run --rm -v cone-data:/data -v $(pwd):/backup alpine tar czf /backup/cone
 
 ## 🔒 Security Features
 
-- **Helmet.js**: Security headers and protection
-- **CORS**: Configurable cross-origin requests
+- **CORS**: Permissive cross-origin requests for development flexibility
 - **Input Validation**: Server-side validation of all inputs
-- **SQL Injection Protection**: Parameterized queries
+- **SQL Injection Protection**: Parameterized queries using sqlite3
 - **Non-root User**: Container runs as non-privileged user
 
 ## 📱 Browser Support

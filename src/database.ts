@@ -35,6 +35,52 @@ export class Database {
     });
   }
 
+  // Recalculate local derived fields (date, time, dayOfWeek) from ISO timestamp
+  // Returns number of rows updated
+  async normalizeDateFields(): Promise<number> {
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const computeFromTimestamp = (iso: string) => {
+      const d = new Date(iso);
+      const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+      const dayOfWeek = days[d.getDay()];
+      return { date, time, dayOfWeek };
+    };
+
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT id, timestamp, date, time, dayOfWeek FROM cones', async (err, rows: any[]) => {
+        if (err) return reject(err);
+        let updated = 0;
+        const runUpdate = (row: any) => new Promise<void>((res, rej) => {
+          const calc = computeFromTimestamp(row.timestamp);
+          if (calc.date !== row.date || calc.time !== row.time || calc.dayOfWeek !== row.dayOfWeek) {
+            const stmt = this.db.prepare('UPDATE cones SET date = ?, time = ?, dayOfWeek = ?, updatedAt = ? WHERE id = ?');
+            stmt.run([calc.date, calc.time, calc.dayOfWeek, new Date().toISOString(), row.id], function(updateErr) {
+              if (updateErr) return rej(updateErr);
+              updated++;
+              res();
+            });
+            stmt.finalize();
+          } else {
+            res();
+          }
+        });
+
+        try {
+          for (const row of rows) {
+            // eslint-disable-next-line no-await-in-loop
+            await runUpdate(row);
+          }
+          resolve(updated);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  }
+
   async addCone(cone: Omit<Cone, 'id'>): Promise<number> {
     return new Promise((resolve, reject) => {
       const stmt = this.db.prepare(`
@@ -135,14 +181,15 @@ export class Database {
 
   async getStats(): Promise<ConeStats> {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
     
     // Get start of week (Monday)
     const startOfWeek = new Date(now);
     const weekday = (now.getDay() + 6) % 7; // Monday=0, Sunday=6
     startOfWeek.setHours(0, 0, 0, 0);
     startOfWeek.setDate(now.getDate() - weekday);
-    const weekStart = startOfWeek.toISOString().split('T')[0];
+    const weekStart = `${startOfWeek.getFullYear()}-${pad2(startOfWeek.getMonth() + 1)}-${pad2(startOfWeek.getDate())}`;
     
     // Get start of month
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -161,14 +208,14 @@ export class Database {
     let monthsSpan = 1;
 
     if (minDateStr) {
-      const start = new Date(`${minDateStr}T00:00:00Z`);
-      const end = new Date(`${today}T00:00:00Z`);
+      const start = new Date(`${minDateStr}T00:00:00`); // local midnight
+      const end = new Date(`${today}T00:00:00`); // local midnight
       const ms = end.getTime() - start.getTime();
       daysSpan = Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
       weeksSpan = Math.max(1, Math.ceil(daysSpan / 7));
 
-      const startMonthIndex = start.getUTCFullYear() * 12 + start.getUTCMonth();
-      const endMonthIndex = end.getUTCFullYear() * 12 + end.getUTCMonth();
+      const startMonthIndex = start.getFullYear() * 12 + start.getMonth();
+      const endMonthIndex = end.getFullYear() * 12 + end.getMonth();
       monthsSpan = Math.max(1, endMonthIndex - startMonthIndex + 1);
     }
 

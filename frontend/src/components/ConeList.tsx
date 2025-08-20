@@ -60,7 +60,7 @@ export const ConeList: React.FC<ConeListProps> = ({ cones, onConesChanged }) => 
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(cone.date).toLocaleDateString()}</span>
+                      <span>{new Date(cone.timestamp).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
                       <Clock className="w-4 h-4" />

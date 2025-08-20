@@ -17,6 +17,15 @@ fi
 
 echo "✅ Node.js version: $(node -v)"
 
+# Check if Docker is available
+if command -v docker &> /dev/null; then
+    echo "✅ Docker is available"
+    DOCKER_AVAILABLE=true
+else
+    echo "⚠️  Docker not found - you can still develop locally"
+    DOCKER_AVAILABLE=false
+fi
+
 # Install backend dependencies
 echo "📦 Installing backend dependencies..."
 npm install
@@ -33,13 +42,22 @@ mkdir -p data
 
 echo "✅ Development environment setup complete!"
 echo ""
-echo "To start development servers:"
-echo "  npm run dev"
+echo "Development options:"
 echo ""
-echo "To build for production:"
-echo "  npm run build"
+echo "Option 1: Local development (two terminals required)"
+echo "  Terminal 1: npm run dev (backend on port 3000)"
+echo "  Terminal 2: cd frontend && npm start (frontend on port 3001)"
 echo ""
-echo "To run with Docker:"
-echo "  docker-compose up -d"
+echo "Option 2: Docker development (single command)"
+if [ "$DOCKER_AVAILABLE" = true ]; then
+    echo "  docker-compose up -d"
+    echo "  Access at http://localhost:3000"
+else
+    echo "  (Docker not available)"
+fi
+echo ""
+echo "Option 3: Production build"
+echo "  cd frontend && npm run build"
+echo "  docker build -t alexschladetsch/cone-counter:latest ."
 echo ""
 echo "Happy coding! 🚬📊"
