@@ -46,6 +46,14 @@ COPY --from=backend-builder /app/package*.json ./
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
 
+# Copy icons provided by user into server root so they are served at /<name>.png
+COPY icons/android-chrome-192x192.png ./frontend/build/android-chrome-192x192.png
+COPY icons/android-chrome-512x512.png ./frontend/build/android-chrome-512x512.png
+COPY icons/apple-touch-icon.png ./frontend/build/apple-touch-icon.png
+COPY icons/favicon-16x16.png ./frontend/build/favicon-16x16.png
+COPY icons/favicon-32x32.png ./frontend/build/favicon-32x32.png
+COPY icons/favicon.ico ./frontend/build/favicon.ico
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
