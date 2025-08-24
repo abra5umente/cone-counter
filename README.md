@@ -1,8 +1,21 @@
 # Cone Counter
+<img width="1354" height="889" alt="Untitled" src="https://github.com/user-attachments/assets/96fcf45d-46bc-44fc-97e4-2a432657e75d" />  
+
 
 A webapp built specfically and only to track how many bongs you smoke.
 
 Built with TypeScript, React, Node.js, and Firebase Firestore, all containerized in a single Docker image.
+
+## Screenshots  
+Main screen:  
+<img width="1354" height="889" alt="Untitled" src="https://github.com/user-attachments/assets/96fcf45d-46bc-44fc-97e4-2a432657e75d" />  
+Adding a new cone:  
+<img width="1356" height="889" alt="Untitled" src="https://github.com/user-attachments/assets/abedaf7a-d48b-4601-b179-c8f5e7c8c802" />  
+Data analytics dashboard (because numbers):  
+<img width="1371" height="1260" alt="Untitled" src="https://github.com/user-attachments/assets/9b81cd48-44a5-4a73-b27a-f347a08c33c3" />  
+Exporting data:  
+<img width="1372" height="896" alt="Untitled" src="https://github.com/user-attachments/assets/bb45109f-b0c6-4ead-b80e-554f56213cbf" />  
+
 
 ## Features
 
@@ -15,6 +28,41 @@ Built with TypeScript, React, Node.js, and Firebase Firestore, all containerized
 - **Modern UI**: Beautiful, responsive interface built with Tailwind CSS with dark mode support
 - **Docker Ready**: Single container deployment with multi-arch support
 - **Timezone Aware**: Consistent local time handling across all displays and statistics
+
+## Usage
+
+### Adding a Cone
+1. Click the "Add Cone" button in the header
+2. Optionally set a custom timestamp (defaults to current local time)
+3. Add optional notes
+4. Click "Add Cone"
+
+### Editing a Cone
+1. Click the edit icon on any cone entry
+2. Modify the timestamp and/or notes
+3. Click "Save Changes"
+
+### Viewing Analytics
+1. Navigate to the "Analytics" tab
+2. View charts showing:
+   - Hour of day patterns
+   - Day of week trends
+   - Monthly usage distribution
+
+### Data Management
+1. Go to the "Data Management" tab
+2. **Export**: Download your data as a JSON file
+3. **Import**: Upload a previously exported file (replaces all data)
+
+## Timezone Handling
+
+The application ensures consistent local time display:
+
+- **Storage**: All timestamps stored as ISO strings in UTC
+- **Display**: Dates and times shown in local timezone
+- **Derived Fields**: `date`, `time`, and `dayOfWeek` computed from local time
+- **Startup Normalization**: Existing data automatically corrected on container restart
+- **Statistics**: All calculations use local dates to prevent timezone-related discrepancies
 
 ## Quick Start
 
@@ -102,27 +150,6 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
    docker build -t alexschladetsch/cone-counter:latest .
    ```
 
-## Project Structure
-
-```
-cone-counter/
-├── src/                    # Backend TypeScript source
-│   ├── database.ts        # Database operations and Firestore schema
-│   ├── server.ts          # Express server with API endpoints
-│   ├── firebase-admin.ts  # Firebase Admin SDK configuration
-│   └── types.ts           # TypeScript interfaces and types
-├── frontend/              # React frontend
-│   ├── src/               # React components and hooks
-│   │   ├── components/    # UI components (AddConeModal, ConeList, etc.)
-│   │   ├── api.ts         # API client functions
-│   │   └── types.ts       # Frontend type definitions
-│   ├── public/            # Static assets and PWA manifest
-│   └── package.json       # Frontend dependencies
-├── Dockerfile             # Multi-stage Docker build
-├── docker-compose.yml     # Local development setup
-└── package.json           # Backend dependencies
-```
-
 ## Configuration
 
 ### Environment Variables
@@ -163,41 +190,6 @@ The application uses Firebase Firestore for data storage, providing automatic sc
 ### Data Management
 - `GET /api/export` - Export all data
 - `POST /api/import` - Import data (replaces existing)
-
-## Usage
-
-### Adding a Cone
-1. Click the "Add Cone" button in the header
-2. Optionally set a custom timestamp (defaults to current local time)
-3. Add optional notes
-4. Click "Add Cone"
-
-### Editing a Cone
-1. Click the edit icon on any cone entry
-2. Modify the timestamp and/or notes
-3. Click "Save Changes"
-
-### Viewing Analytics
-1. Navigate to the "Analytics" tab
-2. View charts showing:
-   - Hour of day patterns
-   - Day of week trends
-   - Monthly usage distribution
-
-### Data Management
-1. Go to the "Data Management" tab
-2. **Export**: Download your data as a JSON file
-3. **Import**: Upload a previously exported file (replaces all data)
-
-## Timezone Handling
-
-The application ensures consistent local time display:
-
-- **Storage**: All timestamps stored as ISO strings in UTC
-- **Display**: Dates and times shown in local timezone
-- **Derived Fields**: `date`, `time`, and `dayOfWeek` computed from local time
-- **Startup Normalization**: Existing data automatically corrected on container restart
-- **Statistics**: All calculations use local dates to prevent timezone-related discrepancies
 
 ## Docker Commands
 
