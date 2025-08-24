@@ -35,11 +35,11 @@ export const Analytics: React.FC<AnalyticsProps> = ({ analysis }) => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Analytics & Trends</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics & Trends</h2>
       
       {/* Hour of Day Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Cones by Hour of Day</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Cones by Hour of Day</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={hourData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -52,8 +52,8 @@ export const Analytics: React.FC<AnalyticsProps> = ({ analysis }) => {
       </div>
 
       {/* Day of Week Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Cones by Day of Week</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Cones by Day of Week</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={dayData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -66,8 +66,8 @@ export const Analytics: React.FC<AnalyticsProps> = ({ analysis }) => {
       </div>
 
       {/* Month Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Cones by Month</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Cones by Month</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={monthData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -81,32 +81,32 @@ export const Analytics: React.FC<AnalyticsProps> = ({ analysis }) => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">Peak Hour</h4>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Peak Hour</h4>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {hourData.reduce((max, item) => item.count > max.count ? item : max).hour}
           </p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {hourData.reduce((max, item) => item.count > max.count ? item : max).count} cones
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">Busiest Day</h4>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Busiest Day</h4>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {dayData.reduce((max, item) => item.count > max.count ? item : max).day}
           </p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {dayData.reduce((max, item) => item.count > max.count ? item : max).count} cones
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">Peak Month</h4>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h4 className="text-sm font-medium text-gray-400 mb-2">Peak Month</h4>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {monthData.reduce((max, item) => item.count > max.count ? item : max).month}
           </p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {monthData.reduce((max, item) => item.count > max.count ? item : max).count} cones
           </p>
         </div>

@@ -1,6 +1,8 @@
 # Cone Counter
 
-A web application for tracking and analyzing bong/cone usage over time. Built with TypeScript, React, Node.js, and Firebase Firestore, all containerized in a single Docker image.
+A webapp built specfically and only to track how many bongs you smoke.
+
+Built with TypeScript, React, Node.js, and Firebase Firestore, all containerized in a single Docker image.
 
 ## Features
 

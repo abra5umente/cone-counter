@@ -5,10 +5,12 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
-// Initialize dark mode from localStorage
-const prefersDark = localStorage.getItem('theme') === 'dark';
-if (prefersDark) {
-	document.documentElement.classList.add('dark');
+// Initialize theme from localStorage or default to light
+const savedTheme = localStorage.getItem('theme') || 'light';
+if (savedTheme === 'dark') {
+  document.documentElement.classList.add('dark');
+} else {
+  document.documentElement.classList.remove('dark');
 }
 
 const root = ReactDOM.createRoot(

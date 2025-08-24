@@ -102,14 +102,14 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onDataImported }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Data Management</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Data Management</h2>
       
       <div className="space-y-6">
         {/* Export Section */}
-        <div className="border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-3">Export Data</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Export Data</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
             Download all your cone data as a JSON file. This is useful for backups or transferring data to another device.
           </p>
           <button
@@ -123,9 +123,9 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onDataImported }
         </div>
 
         {/* Import Section */}
-        <div className="border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-3">Import Data</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Import Data</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
             Import cone data from a previously exported file. <strong>Warning:</strong> This will replace all existing data.
           </p>
           
@@ -149,8 +149,8 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onDataImported }
           {importMessage && (
             <div className={`mt-4 p-3 rounded-md flex items-center space-x-2 ${
               importMessage.type === 'success' 
-                ? 'bg-green-50 text-green-800 border border-green-200' 
-                : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700' 
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-700'
             }`}>
               {importMessage.type === 'success' ? (
                 <CheckCircle className="w-5 h-5" />
@@ -163,12 +163,12 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onDataImported }
         </div>
 
         {/* Data Safety Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
           <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
             <div>
-              <h4 className="text-sm font-medium text-yellow-800">Data Safety Notice</h4>
-              <p className="text-sm text-yellow-700 mt-1">
+              <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Data Safety Notice</h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-200 mt-1">
                 Always export your data before making major changes. Import operations will replace all existing data, 
                 so make sure you have a backup if needed.
               </p>

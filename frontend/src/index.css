@@ -10,6 +10,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
+  color: #1f2937;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light theme (default) */
+html {
+  background-color: #f8fafc;
+}
+
+/* Dark theme */
+html.dark {
+  background-color: #1a1a1a;
+}
+
+html.dark body {
+  background-color: #1a1a1a;
+  color: #ffffff;
 }
 
 code {

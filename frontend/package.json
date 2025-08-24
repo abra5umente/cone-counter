@@ -7,6 +7,7 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "all": "^0.0.0",
     "date-fns": "^2.30.0",
     "firebase": "^12.1.0",
     "lucide-react": "^0.541.0",
