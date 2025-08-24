@@ -8,7 +8,7 @@ import {
   onAuthStateChanged,
   UserCredential
 } from 'firebase/auth';
-import { getFirebaseAuth, getGoogleProvider } from '../firebase';
+import { getFirebaseAuth, getGoogleProvider, isFirebaseReady, getFirebaseInitPromise } from '../firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -37,21 +37,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [firebaseReady, setFirebaseReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
-  // Wait for Firebase to be ready
+  // Wait for Firebase to be ready with better error handling
   useEffect(() => {
-    const checkFirebase = () => {
-      const auth = getFirebaseAuth();
-      if (auth) {
-        setFirebaseReady(true);
-      } else {
-        // Check again in a moment
-        setTimeout(checkFirebase, 100);
+    const checkFirebase = async () => {
+      try {
+        // First check if Firebase is already ready
+        if (isFirebaseReady()) {
+          setFirebaseReady(true);
+          return;
+        }
+
+        // Wait for Firebase initialization to complete
+        await getFirebaseInitPromise();
+        
+        // Double-check that Firebase is ready
+        if (isFirebaseReady()) {
+          setFirebaseReady(true);
+        } else {
+          throw new Error('Firebase initialization completed but services are not available');
+        }
+      } catch (error) {
+        console.error('Firebase initialization failed:', error);
+        setInitError(error instanceof Error ? error.message : 'Unknown Firebase error');
+        
+        // Retry after a delay for mobile devices
+        setTimeout(() => {
+          if (!firebaseReady) {
+            console.log('Retrying Firebase initialization...');
+            checkFirebase();
+          }
+        }, 2000);
       }
     };
     
     checkFirebase();
-  }, []);
+  }, [firebaseReady]);
 
   function signUp(email: string, password: string) {
     const auth = getFirebaseAuth();
@@ -85,12 +107,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user ? `User ${user.uid} signed in` : 'User signed out');
       setCurrentUser(user);
+      setLoading(false);
+    }, (error) => {
+      console.error('Auth state change error:', error);
       setLoading(false);
     });
 
     return unsubscribe;
   }, [firebaseReady]);
+
+  // Show error state if Firebase fails to initialize
+  if (initError && !firebaseReady) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+            Connection Error
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            Failed to connect to the service. This might be a temporary issue.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+          >
+            Retry
+          </button>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+            Error: {initError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const value = {
     currentUser,

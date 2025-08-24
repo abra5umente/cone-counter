@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChartNoAxesColumnIncreasing, Plus, Sunrise, History, CalendarDays, BarChart3, Database, Home, Moon, Sun, LogOut, User, Cannabis } from 'lucide-react';
+import { ChartNoAxesColumnIncreasing, Plus, Sunrise, History, CalendarDays, BarChart3, Database, Home, Moon, Sun, LogOut, User, Cannabis, RefreshCw } from 'lucide-react';
 import { Cone, ConeStats, TimeAnalysis } from './types';
 import { ConeAPI } from './api';
 import { useAuth } from './contexts/AuthContext';
@@ -8,6 +8,7 @@ import { AddConeModal } from './components/AddConeModal';
 import { ConeList } from './components/ConeList';
 import { Analytics } from './components/Analytics';
 import { DataManagement } from './components/DataManagement';
+import { MobileDebug } from './components/MobileDebug';
 
 type Tab = 'dashboard' | 'analytics' | 'data';
 
@@ -19,11 +20,36 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [dark, setDark] = useState<boolean>(document.documentElement.classList.contains('dark'));
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const [lastTapTime, setLastTapTime] = useState(0);
   
   const { currentUser, logout } = useAuth();
 
-  const fetchData = async () => {
+  // Mobile debug trigger (triple tap on header)
+  const handleHeaderTap = () => {
+    const now = Date.now();
+    if (now - lastTapTime < 500) {
+      setTapCount(prev => prev + 1);
+      if (tapCount === 2) {
+        setShowDebug(true);
+        setTapCount(0);
+      }
+    } else {
+      setTapCount(1);
+    }
+    setLastTapTime(now);
+  };
+
+  const fetchData = async (isRetry = false) => {
     try {
+      setError(null);
+      setIsLoading(true);
+      
+      console.log('Fetching data...', { isRetry, retryCount });
+      
       const [conesData, statsData, analysisData] = await Promise.all([
         ConeAPI.getAllCones(),
         ConeAPI.getStats(),
@@ -33,11 +59,36 @@ function AppContent() {
       setCones(conesData);
       setStats(statsData);
       setAnalysis(analysisData);
+      setRetryCount(0); // Reset retry count on success
+      
+      console.log('Data fetched successfully:', {
+        cones: conesData.length,
+        stats: statsData,
+        analysis: analysisData
+      });
     } catch (error) {
       console.error('Failed to fetch data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      
+      // Auto-retry logic for mobile devices
+      if (!isRetry && retryCount < 3) {
+        const nextRetryCount = retryCount + 1;
+        setRetryCount(nextRetryCount);
+        console.log(`Auto-retrying data fetch in 2 seconds... (${nextRetryCount}/3)`);
+        
+        setTimeout(() => {
+          fetchData(true);
+        }, 2000);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(0);
+    fetchData();
   };
 
   useEffect(() => {
@@ -82,6 +133,35 @@ function AppContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cone-green mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-300">Loading Cone Counter...</p>
+          {retryCount > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Retry attempt {retryCount}/3
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if data fetching failed
+  if (error && !stats && !cones.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+            Failed to Load Data
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            {error}
+          </p>
+          <button
+            onClick={handleRetry}
+            className="bg-cone-green text-white px-4 py-2 rounded hover:bg-green-600 transition-colors flex items-center mx-auto"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -90,7 +170,10 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header 
+        className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700"
+        onClick={handleHeaderTap}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
@@ -181,6 +264,28 @@ function AppContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
+            {/* Error Banner */}
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="text-red-500 text-xl mr-2">⚠️</div>
+                    <div>
+                      <p className="text-red-800 dark:text-red-200 font-medium">Some data failed to load</p>
+                      <p className="text-red-600 dark:text-red-300 text-sm">{error}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRetry}
+                    className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors flex items-center"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Stats Cards */}
             {stats && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -257,6 +362,12 @@ function AppContent() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onConeAdded={handleConeAdded}
+      />
+
+      {/* Mobile Debug Component */}
+      <MobileDebug 
+        isVisible={showDebug} 
+        onClose={() => setShowDebug(false)} 
       />
     </div>
   );

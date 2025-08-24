@@ -22,11 +22,37 @@ initializeFirebaseAdmin();
 // Initialize database
 const db = new Database();
 
+// Enhanced CORS configuration for mobile devices
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  preflightContinue: false
+};
+
 // Middleware (no security headers; allow wide-open CORS for simplicity)
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'] }));
+app.use(cors(corsOptions));
 app.use(morgan('combined'));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increase limit for mobile data import
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// Mobile detection middleware
+app.use((req, res, next) => {
+  const userAgent = req.headers['user-agent'] || '';
+  const isMobile = /Mobile|Android|iPhone|iPad|Windows Phone/i.test(userAgent);
+  
+  // Add mobile info to request for logging
+  (req as any).isMobile = isMobile;
+  
+  // Log mobile requests for debugging
+  if (isMobile) {
+    console.log(`Mobile request: ${req.method} ${req.path} - User-Agent: ${userAgent.substring(0, 100)}...`);
+  }
+  
+  next();
+});
 
 // Firebase Admin SDK setup (we'll need to install this)
 // For now, we'll use a simple JWT verification middleware
@@ -38,6 +64,7 @@ interface AuthenticatedRequest extends express.Request {
     email: string;
     displayName?: string;
   };
+  isMobile?: boolean;
 }
 
 // Firebase Admin authentication middleware
@@ -78,7 +105,18 @@ async function authenticateUser(req: AuthenticatedRequest, res: express.Response
     next();
   } catch (error) {
     console.error('Authentication error:', error);
-    return res.status(401).json({ error: 'Invalid token', details: error instanceof Error ? error.message : 'Unknown error' });
+    
+    // Enhanced error response for mobile debugging
+    const errorResponse = {
+      error: 'Invalid token',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+      path: req.path,
+      method: req.method,
+      isMobile: req.isMobile
+    };
+    
+    return res.status(401).json(errorResponse);
   }
 }
 
@@ -243,12 +281,68 @@ app.get('/api/stats', authenticateUser, async (req: AuthenticatedRequest, res) =
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
+    console.log(`Fetching stats for user ${req.user.uid} (mobile: ${req.isMobile})`);
+    
+    const startTime = Date.now();
     const stats = await db.getStats(req.user.uid);
-    res.json(stats);
+    const duration = Date.now() - startTime;
+    
+    console.log(`Stats fetched successfully in ${duration}ms for user ${req.user.uid}`);
+    
+    // Add mobile-specific debugging info
+    const response = {
+      ...stats,
+      _debug: {
+        timestamp: new Date().toISOString(),
+        duration: `${duration}ms`,
+        isMobile: req.isMobile,
+        userAgent: req.headers['user-agent']?.substring(0, 100) || 'unknown'
+      }
+    };
+    
+    res.json(response);
   } catch (error) {
     console.error('Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics', details: error instanceof Error ? error.message : 'Unknown error' });
+    
+    // Enhanced error response for mobile debugging
+    const errorResponse = {
+      error: 'Failed to fetch statistics',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+      path: req.path,
+      method: req.method,
+      isMobile: req.isMobile,
+      userId: req.user?.uid
+    };
+    
+    res.status(500).json(errorResponse);
   }
+});
+
+// Mobile-specific health check endpoint
+app.get('/api/mobile-health', (req, res) => {
+  const userAgent = req.headers['user-agent'] || '';
+  const isMobile = /Mobile|Android|iPhone|iPad|Windows Phone/i.test(userAgent);
+  
+  const healthInfo = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    isMobile,
+    userAgent: userAgent.substring(0, 200),
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'unknown',
+      port: PORT,
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID ? 'configured' : 'missing'
+    },
+    features: {
+      cors: true,
+      firebase: !!process.env.FIREBASE_PROJECT_ID,
+      database: true
+    }
+  };
+  
+  console.log('Mobile health check:', healthInfo);
+  res.json(healthInfo);
 });
 
 // Get time analysis for authenticated user
