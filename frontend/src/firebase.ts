@@ -10,21 +10,27 @@ const getFirebaseConfig = async () => {
 
   // Try to fetch from backend API (for Docker deployment)
   try {
+    console.log('Attempting to fetch Firebase config from backend...');
     const response = await fetch('/api/firebase-config');
+    console.log('Firebase config response status:', response.status);
     if (response.ok) {
       const config = await response.json();
+      console.log('Firebase config received from backend:', config);
       // Cache the config in window for future use
       if (typeof window !== 'undefined') {
         (window as any).__FIREBASE_CONFIG__ = config;
       }
       return config;
+    } else {
+      console.error('Firebase config response not ok:', response.status, response.statusText);
     }
   } catch (error) {
-    console.log('Could not fetch Firebase config from backend, using build-time config');
+    console.error('Could not fetch Firebase config from backend:', error);
+    console.log('Falling back to build-time config');
   }
 
   // Fall back to build-time environment variables
-  return {
+  const buildTimeConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -32,6 +38,9 @@ const getFirebaseConfig = async () => {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID
   };
+  
+  console.log('Using build-time Firebase config:', buildTimeConfig);
+  return buildTimeConfig;
 };
 
 // Initialize Firebase asynchronously

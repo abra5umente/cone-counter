@@ -18,13 +18,20 @@ async function getAuthHeaders(): Promise<HeadersInit> {
     throw new Error('User not authenticated');
   }
   
+  console.log('Getting ID token for user:', user.uid);
+  
   // Get the Firebase ID token
   const token = await user.getIdToken();
+  console.log('Token received, length:', token.length);
   
-  return {
+  const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
   };
+  
+  console.log('Auth headers prepared:', { ...headers, Authorization: `Bearer ${token.substring(0, 20)}...` });
+  
+  return headers;
 }
 
 export class ConeAPI {

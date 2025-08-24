@@ -45,20 +45,27 @@ async function authenticateUser(req: AuthenticatedRequest, res: express.Response
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('No authorization header or invalid format');
     return res.status(401).json({ error: 'No token provided' });
   }
 
   const token = authHeader.substring(7);
+  console.log('Received token, length:', token.length);
   
   try {
     // Verify the Firebase ID token
+    console.log('Verifying token...');
     const decodedToken = await verifyIdToken(token);
+    console.log('Token verified successfully for user:', decodedToken.uid);
     
     // Get or create user in database
     let user = await db.getUser(decodedToken.uid);
     if (!user) {
+      console.log('Creating new user in database:', decodedToken.uid);
       await db.createUser(decodedToken.uid, decodedToken.email, decodedToken.displayName);
       user = await db.getUser(decodedToken.uid);
+    } else {
+      console.log('User found in database:', decodedToken.uid);
     }
     
     req.user = {
@@ -67,10 +74,11 @@ async function authenticateUser(req: AuthenticatedRequest, res: express.Response
       displayName: decodedToken.displayName
     };
     
+    console.log('Authentication successful, proceeding to next middleware');
     next();
   } catch (error) {
     console.error('Authentication error:', error);
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
 
@@ -309,12 +317,12 @@ app.get('/api/cones/range/:start/:end', authenticateUser, async (req: Authentica
 // Get Firebase configuration for frontend
 app.get('/api/firebase-config', (req, res) => {
   const config = {
-    apiKey: process.env.VITE_FIREBASE_API_KEY,
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.VITE_FIREBASE_APP_ID
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
   };
   
   // Check if all required config values are present
