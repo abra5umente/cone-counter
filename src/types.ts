@@ -1,5 +1,5 @@
 export interface Cone {
-  id: number;
+  id: string;
   timestamp: string;
   date: string;
   time: string;

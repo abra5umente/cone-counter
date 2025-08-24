@@ -1,19 +1,29 @@
-# 🚬 Cone Counter
+# Cone Counter
 
-A web application for tracking and analyzing bong/cone usage over time. Built with TypeScript, React, Node.js, and SQLite, all containerized in a single Docker image.
+A web application for tracking and analyzing bong/cone usage over time. Built with TypeScript, React, Node.js, and Firebase Firestore, all containerized in a single Docker image.
 
-## ✨ Features
+## Features
 
-- **📊 Real-time Statistics**: Track total cones, daily/weekly/monthly counts, and averages
-- **📈 Analytics & Trends**: Visualize usage patterns by hour, day of week, and month
-- **✏️ Edit & Manage**: Modify existing entries with timestamps and notes
-- **💾 Persistent Storage**: SQLite database with automatic data persistence
-- **📤 Export/Import**: Backup and restore your data with JSON files
-- **🎨 Modern UI**: Beautiful, responsive interface built with Tailwind CSS with dark mode support
-- **🐳 Docker Ready**: Single container deployment with multi-arch support
-- **🌍 Timezone Aware**: Consistent local time handling across all displays and statistics
+- **Real-time Statistics**: Track total cones, daily/weekly/monthly counts, and averages
+- **Analytics & Trends**: Visualize usage patterns by hour, day of week, and month
+- **Edit & Manage**: Modify existing entries with timestamps and notes
+- **Cloud Storage**: Firebase Firestore database with automatic scaling and real-time sync
+- **User Authentication**: Secure Google Sign-in with Firebase Auth
+- **Export/Import**: Backup and restore your data with JSON files
+- **Modern UI**: Beautiful, responsive interface built with Tailwind CSS with dark mode support
+- **Docker Ready**: Single container deployment with multi-arch support
+- **Timezone Aware**: Consistent local time handling across all displays and statistics
 
-## 🚀 Quick Start
+## Quick Start
+
+### Prerequisites
+
+Before running the application, you need to set up Firebase:
+
+1. **Create a Firebase project** at [Firebase Console](https://console.firebase.google.com/)
+2. **Enable Firestore Database** and **Authentication**
+3. **Generate a service account key** for the backend
+4. **Set up environment variables** (see `backend.env.example`)
 
 ### Using Docker (Recommended)
 
@@ -28,7 +38,7 @@ A web application for tracking and analyzing bong/cone usage over time. Built wi
    docker build -t alexschladetsch/cone-counter:latest .
    
    # Run the container
-   docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
+   docker run -d -p 3000:3000 alexschladetsch/cone-counter:latest
    ```
 
 3. **Access the application:**
@@ -47,7 +57,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
 docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-counter:latest .
 ```
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
@@ -90,13 +100,14 @@ docker buildx build --platform linux/amd64,linux/arm64 -t alexschladetsch/cone-c
    docker build -t alexschladetsch/cone-counter:latest .
    ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 cone-counter/
 ├── src/                    # Backend TypeScript source
-│   ├── database.ts        # Database operations and SQLite schema
+│   ├── database.ts        # Database operations and Firestore schema
 │   ├── server.ts          # Express server with API endpoints
+│   ├── firebase-admin.ts  # Firebase Admin SDK configuration
 │   └── types.ts           # TypeScript interfaces and types
 ├── frontend/              # React frontend
 │   ├── src/               # React components and hooks
@@ -110,23 +121,30 @@ cone-counter/
 └── package.json           # Backend dependencies
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
 - `PORT`: Server port (default: 3000)
 - `NODE_ENV`: Environment mode (default: production)
+- `FIREBASE_PROJECT_ID`: Your Firebase project ID
+- `FIREBASE_PRIVATE_KEY`: Service account private key
+- `FIREBASE_CLIENT_EMAIL`: Service account email
+- `FIREBASE_CLIENT_ID`: Service account client ID
+- `FIREBASE_PRIVATE_KEY_ID`: Service account private key ID
+- `FIREBASE_CLIENT_CERT_URL`: Service account certificate URL
 
 ### Database
 
-The application uses SQLite for data storage, automatically created in the `/app/data` directory within the container. Data is persisted using Docker volumes.
+The application uses Firebase Firestore for data storage, providing automatic scaling and real-time synchronization.
 
 **Database Schema:**
-- `cones` table with fields: `id`, `timestamp` (ISO), `date` (YYYY-MM-DD), `time` (HH:MM:SS), `dayOfWeek`, `notes`, `createdAt`, `updatedAt`
+- `cones` collection with fields: `id`, `timestamp` (ISO), `date` (YYYY-MM-DD), `time` (HH:MM:SS), `dayOfWeek`, `notes`, `createdAt`, `updatedAt`, `userId`
+- `users` collection for user management
 - Automatic indexing on `timestamp`, `date`, and `dayOfWeek` for performance
 - Startup normalization ensures all derived date fields match local time
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### Cones
 - `GET /api/cones` - Get all cones
@@ -144,7 +162,7 @@ The application uses SQLite for data storage, automatically created in the `/app
 - `GET /api/export` - Export all data
 - `POST /api/import` - Import data (replaces existing)
 
-## 🎯 Usage
+## Usage
 
 ### Adding a Cone
 1. Click the "Add Cone" button in the header
@@ -153,7 +171,7 @@ The application uses SQLite for data storage, automatically created in the `/app
 4. Click "Add Cone"
 
 ### Editing a Cone
-1. Click the edit icon (✏️) on any cone entry
+1. Click the edit icon on any cone entry
 2. Modify the timestamp and/or notes
 3. Click "Save Changes"
 
@@ -169,7 +187,7 @@ The application uses SQLite for data storage, automatically created in the `/app
 2. **Export**: Download your data as a JSON file
 3. **Import**: Upload a previously exported file (replaces all data)
 
-## 🌍 Timezone Handling
+## Timezone Handling
 
 The application ensures consistent local time display:
 
@@ -179,18 +197,18 @@ The application ensures consistent local time display:
 - **Startup Normalization**: Existing data automatically corrected on container restart
 - **Statistics**: All calculations use local dates to prevent timezone-related discrepancies
 
-## 🐳 Docker Commands
+## Docker Commands
 
 ### Build and Run
 ```bash
 # Build the image
 docker build -t alexschladetsch/cone-counter:latest .
 
-# Run with port mapping and volume
-docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
+# Run with port mapping
+docker run -d -p 3000:3000 alexschladetsch/cone-counter:latest
 
 # Run in background
-docker run -d --name cone-counter -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
+docker run -d --name cone-counter -p 3000:3000 alexschladetsch/cone-counter:latest
 ```
 
 ### Management
@@ -208,33 +226,21 @@ docker rm cone-counter
 docker ps
 ```
 
-### Data Persistence
-```bash
-# List volumes
-docker volume ls
-
-# Inspect volume
-docker volume inspect cone-data
-
-# Backup volume data
-docker run --rm -v cone-data:/data -v $(pwd):/backup alpine tar czf /backup/cone-data-backup.tar.gz -C /data .
-```
-
-## 🔒 Security Features
+## Security Features
 
 - **CORS**: Permissive cross-origin requests for development flexibility
 - **Input Validation**: Server-side validation of all inputs
-- **SQL Injection Protection**: Parameterized queries using sqlite3
+- **Firebase Security**: Firestore security rules for data protection
 - **Non-root User**: Container runs as non-privileged user
 
-## 📱 Browser Support
+## Browser Support
 
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
 - Edge 90+
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -242,11 +248,11 @@ docker run --rm -v cone-data:/data -v $(pwd):/backup alpine tar czf /backup/cone
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## Support
 
 If you encounter any issues:
 
@@ -255,7 +261,7 @@ If you encounter any issues:
 3. Check the health endpoint: `http://localhost:3000/api/stats`
 4. Ensure port 3000 is available and not blocked by firewall
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Deployment
 
@@ -269,7 +275,6 @@ docker pull alexschladetsch/cone-counter:latest
 docker run -d \
   --name cone-counter \
   -p 3000:3000 \
-  -v cone-data:/app/data \
   --restart unless-stopped \
   alexschladetsch/cone-counter:latest
 ```
@@ -280,4 +285,4 @@ For production use, consider placing behind a reverse proxy (nginx, Traefik, etc
 
 ---
 
-**Happy tracking! 🚬📊**
+**Happy tracking!**

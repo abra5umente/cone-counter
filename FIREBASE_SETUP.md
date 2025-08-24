@@ -10,7 +10,7 @@
 
 ## Step 2: Configure Environment Variables
 
-Create a `.env` file in your project root with these values from your service account JSON:
+Create a `backend.env` file in your project root with these values from your service account JSON:
 
 ```bash
 # Backend Environment Variables
@@ -41,8 +41,8 @@ VITE_FIREBASE_APP_ID=your-app-id
 
 ## Step 4: Test Authentication
 
-1. Start your backend: `npm run dev:backend`
-2. Start your frontend: `npm run dev:frontend`
+1. Start your backend: `npm run dev`
+2. Start your frontend: `cd frontend && npm start`
 3. Sign in with Google in the frontend
 4. The backend should now properly verify Firebase tokens
 
@@ -50,4 +50,4 @@ VITE_FIREBASE_APP_ID=your-app-id
 
 - **401 errors**: Check that your service account key is correct
 - **Token verification failed**: Ensure your Firebase project ID matches
-- **Missing environment variables**: Check your `.env` file exists and has all required values
+- **Missing environment variables**: Check your `backend.env` file exists and has all required values

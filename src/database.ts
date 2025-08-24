@@ -1,116 +1,36 @@
-import { Pool, PoolClient } from 'pg';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Cone, ConeStats, TimeAnalysis, ExportData } from './types';
 
 export class Database {
-  private pool: Pool;
+  private db: any;
 
   constructor() {
-    this.pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'cone_counter',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-
-    this.initDatabase();
-  }
-
-  private async initDatabase(): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      // Create users table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          email TEXT UNIQUE NOT NULL,
-          display_name TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `);
-
-      // Create cones table with user support
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS cones (
-          id SERIAL PRIMARY KEY,
-          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          timestamp TEXT NOT NULL,
-          date TEXT NOT NULL,
-          time TEXT NOT NULL,
-          day_of_week TEXT NOT NULL,
-          notes TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      `);
-
-      // Create indexes for better performance
-      await client.query('CREATE INDEX IF NOT EXISTS idx_cones_user_id ON cones(user_id)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_cones_timestamp ON cones(timestamp)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_cones_date ON cones(date)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_cones_day_of_week ON cones(day_of_week)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_cones_user_date ON cones(user_id, date)');
-
-      // Create function to update updated_at timestamp
-      await client.query(`
-        CREATE OR REPLACE FUNCTION update_updated_at_column()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.updated_at = NOW();
-          RETURN NEW;
-        END;
-        $$ language 'plpgsql'
-      `);
-
-      // Create trigger for cones table
-      await client.query(`
-        DROP TRIGGER IF EXISTS update_cones_updated_at ON cones;
-        CREATE TRIGGER update_cones_updated_at
-          BEFORE UPDATE ON cones
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column()
-      `);
-
-    } finally {
-      client.release();
-    }
+    this.db = getFirestore();
   }
 
   // User management methods
   async createUser(firebaseUid: string, email: string, displayName?: string): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query(
-        'INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = $2, display_name = $3, updated_at = NOW()',
-        [firebaseUid, email, displayName]
-      );
-    } finally {
-      client.release();
-    }
+    const userRef = this.db.collection('users').doc(firebaseUid);
+    await userRef.set({
+      email,
+      displayName,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
   }
 
   async getUser(firebaseUid: string): Promise<{ id: string; email: string; displayName?: string } | null> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        'SELECT id, email, display_name FROM users WHERE id = $1',
-        [firebaseUid]
-      );
-      if (result.rows.length === 0) return null;
-      
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        email: row.email,
-        displayName: row.display_name
-      };
-    } finally {
-      client.release();
-    }
+    const userRef = this.db.collection('users').doc(firebaseUid);
+    const userSnap = await userRef.get();
+    
+    if (!userSnap.exists) return null;
+    
+    const userData = userSnap.data();
+    return {
+      id: firebaseUid,
+      email: userData.email,
+      displayName: userData.displayName
+    };
   }
 
   // Recalculate local derived fields (date, time, dayOfWeek) from ISO timestamp
@@ -127,306 +47,338 @@ export class Database {
       return { date, time, dayOfWeek };
     };
 
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        'SELECT id, timestamp, date, time, day_of_week FROM cones WHERE user_id = $1',
-        [userId]
-      );
+    const conesRef = this.db.collection('cones');
+    const querySnapshot = await conesRef.where('userId', '==', userId).get();
 
-      let updated = 0;
-      for (const row of result.rows) {
-        const calc = computeFromTimestamp(row.timestamp);
-        if (calc.date !== row.date || calc.time !== row.time || calc.dayOfWeek !== row.day_of_week) {
-          await client.query(
-            'UPDATE cones SET date = $1, time = $2, day_of_week = $3, updated_at = $4 WHERE id = $5',
-            [calc.date, calc.time, calc.dayOfWeek, new Date().toISOString(), row.id]
-          );
-          updated++;
-        }
+    let updated = 0;
+    const batch = this.db.batch();
+
+    querySnapshot.forEach((docSnapshot: any) => {
+      const data = docSnapshot.data();
+      const calc = computeFromTimestamp(data.timestamp);
+      
+      if (calc.date !== data.date || calc.time !== data.time || calc.dayOfWeek !== data.dayOfWeek) {
+        const coneRef = this.db.collection('cones').doc(docSnapshot.id);
+        batch.update(coneRef, {
+          date: calc.date,
+          time: calc.time,
+          dayOfWeek: calc.dayOfWeek,
+          updatedAt: new Date().toISOString()
+        });
+        updated++;
       }
-      return updated;
-    } finally {
-      client.release();
+    });
+
+    if (updated > 0) {
+      await batch.commit();
     }
+
+    return updated;
   }
 
-  async addCone(userId: string, cone: Omit<Cone, 'id'>): Promise<number> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `INSERT INTO cones (user_id, timestamp, date, time, day_of_week, notes, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [
-          userId,
-          cone.timestamp,
-          cone.date,
-          cone.time,
-          cone.dayOfWeek,
-          cone.notes || null,
-          cone.createdAt,
-          cone.updatedAt
-        ]
-      );
-      return result.rows[0].id;
-    } finally {
-      client.release();
-    }
+  async addCone(userId: string, cone: Omit<Cone, 'id'>): Promise<string> {
+    const conesRef = this.db.collection('cones');
+    const docRef = await conesRef.add({
+      ...cone,
+      userId
+    });
+    return docRef.id;
   }
 
-  async updateCone(userId: string, id: number, updates: Partial<Cone>): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-      const fields = Object.keys(updates).filter(key => key !== 'id');
-      const values = Object.values(updates).filter(value => value !== undefined);
-      
-      if (fields.length === 0) {
-        return false;
-      }
+  async updateCone(userId: string, id: string, updates: Partial<Cone>): Promise<boolean> {
+    const coneRef = this.db.collection('cones').doc(id);
+    const coneSnap = await coneRef.get();
+    
+    if (!coneSnap.exists) return false;
+    
+    const coneData = coneSnap.data();
+    if (coneData.userId !== userId) return false;
 
-      // Convert field names to snake_case for PostgreSQL
-      const snakeCaseFields = fields.map(field => {
-        const mapping: { [key: string]: string } = {
-          dayOfWeek: 'day_of_week',
-          createdAt: 'created_at',
-          updatedAt: 'updated_at'
-        };
-        return mapping[field] || field;
-      });
-
-      const setClause = snakeCaseFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-      const sql = `UPDATE cones SET ${setClause}, updated_at = $${values.length + 1} WHERE id = $${values.length + 2} AND user_id = $${values.length + 3}`;
-      
-          const result = await client.query(sql, [...values, new Date().toISOString(), id, userId]);
-    return (result.rowCount || 0) > 0;
-    } finally {
-      client.release();
-    }
+    const updateData = {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    
+    await coneRef.update(updateData);
+    return true;
   }
 
-  async deleteCone(userId: string, id: number): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-          const result = await client.query(
-      'DELETE FROM cones WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
-    return (result.rowCount || 0) > 0;
-    } finally {
-      client.release();
-    }
+  async deleteCone(userId: string, id: string): Promise<boolean> {
+    const coneRef = this.db.collection('cones').doc(id);
+    const coneSnap = await coneRef.get();
+    
+    if (!coneSnap.exists) return false;
+    
+    const coneData = coneSnap.data();
+    if (coneData.userId !== userId) return false;
+
+    await coneRef.delete();
+    return true;
   }
 
-  async getCone(userId: string, id: number): Promise<Cone | null> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        'SELECT * FROM cones WHERE id = $1 AND user_id = $2',
-        [id, userId]
-      );
-      
-      if (result.rows.length === 0) return null;
-      
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        timestamp: row.timestamp,
-        date: row.date,
-        time: row.time,
-        dayOfWeek: row.day_of_week,
-        notes: row.notes,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      };
-    } finally {
-      client.release();
-    }
+  async getCone(userId: string, id: string): Promise<Cone | null> {
+    const coneRef = this.db.collection('cones').doc(id);
+    const coneSnap = await coneRef.get();
+    
+    if (!coneSnap.exists) return null;
+    
+    const coneData = coneSnap.data();
+    if (coneData.userId !== userId) return null;
+
+    return {
+      id: coneSnap.id,
+      timestamp: coneData.timestamp,
+      date: coneData.date,
+      time: coneData.time,
+      dayOfWeek: coneData.dayOfWeek,
+      notes: coneData.notes,
+      createdAt: coneData.createdAt,
+      updatedAt: coneData.updatedAt
+    };
   }
 
   async getAllCones(userId: string): Promise<Cone[]> {
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        'SELECT * FROM cones WHERE user_id = $1 ORDER BY timestamp DESC',
-        [userId]
-      );
-      
-      return result.rows.map(row => ({
-        id: row.id,
-        timestamp: row.timestamp,
-        date: row.date,
-        time: row.time,
-        dayOfWeek: row.day_of_week,
-        notes: row.notes,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
-    } finally {
-      client.release();
+      const conesRef = this.db.collection('cones');
+      // First try with orderBy, if it fails due to missing index, fall back to simple query
+      try {
+        const querySnapshot = await conesRef.where('userId', '==', userId).orderBy('timestamp', 'desc').get();
+        
+        return querySnapshot.docs.map((docSnapshot: any) => {
+          const data = docSnapshot.data();
+          return {
+            id: docSnapshot.id,
+            timestamp: data.timestamp,
+            date: data.date,
+            time: data.time,
+            dayOfWeek: data.dayOfWeek,
+            notes: data.notes,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+      } catch (orderByError) {
+        console.log('OrderBy query failed, falling back to simple query:', orderByError);
+        // Fallback: get all cones and sort in memory
+        const querySnapshot = await conesRef.where('userId', '==', userId).get();
+        
+        const cones = querySnapshot.docs.map((docSnapshot: any) => {
+          const data = docSnapshot.data();
+          return {
+            id: docSnapshot.id,
+            timestamp: data.timestamp,
+            date: data.date,
+            time: data.time,
+            dayOfWeek: data.dayOfWeek,
+            notes: data.notes,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+        
+        // Sort by timestamp descending in memory
+        return cones.sort((a: Cone, b: Cone) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      }
+    } catch (error) {
+      console.error('Error in getAllCones:', error);
+      throw error;
     }
   }
 
   async getConesByDateRange(userId: string, startDate: string, endDate: string): Promise<Cone[]> {
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        'SELECT * FROM cones WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY timestamp DESC',
-        [userId, startDate, endDate]
-      );
-      
-      return result.rows.map(row => ({
-        id: row.id,
-        timestamp: row.timestamp,
-        date: row.date,
-        time: row.time,
-        dayOfWeek: row.day_of_week,
-        notes: row.notes,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
-    } finally {
-      client.release();
+      const conesRef = this.db.collection('cones');
+      // Try with orderBy first, fallback to simple query if index is missing
+      try {
+        const querySnapshot = await conesRef
+          .where('userId', '==', userId)
+          .where('date', '>=', startDate)
+          .where('date', '<=', endDate)
+          .orderBy('timestamp', 'desc')
+          .get();
+        
+        return querySnapshot.docs.map((docSnapshot: any) => {
+          const data = docSnapshot.data();
+          return {
+            id: docSnapshot.id,
+            timestamp: data.timestamp,
+            date: data.date,
+            time: data.time,
+            dayOfWeek: data.dayOfWeek,
+            notes: data.notes,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+      } catch (orderByError) {
+        console.log('OrderBy query failed in getConesByDateRange, falling back to simple query:', orderByError);
+        // Fallback: get all cones and filter/sort in memory
+        const querySnapshot = await conesRef
+          .where('userId', '==', userId)
+          .where('date', '>=', startDate)
+          .where('date', '<=', endDate)
+          .get();
+        
+        const cones = querySnapshot.docs.map((docSnapshot: any) => {
+          const data = docSnapshot.data();
+          return {
+            id: docSnapshot.id,
+            timestamp: data.timestamp,
+            date: data.date,
+            time: data.time,
+            dayOfWeek: data.dayOfWeek,
+            notes: data.notes,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+        
+        // Sort by timestamp descending in memory
+        return cones.sort((a: Cone, b: Cone) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      }
+    } catch (error) {
+      console.error('Error in getConesByDateRange:', error);
+      throw error;
     }
   }
 
   private async getMinDate(userId: string): Promise<string | null> {
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        'SELECT MIN(date) as min_date FROM cones WHERE user_id = $1',
-        [userId]
-      );
-      return result.rows[0]?.min_date || null;
-    } finally {
-      client.release();
+      const conesRef = this.db.collection('cones');
+      // Try with orderBy first, fallback to simple query if index is missing
+      try {
+        const querySnapshot = await conesRef
+          .where('userId', '==', userId)
+          .orderBy('date', 'asc')
+          .limit(1)
+          .get();
+        
+        if (querySnapshot.empty) return null;
+        
+        const firstDoc = querySnapshot.docs[0];
+        return firstDoc.data().date;
+      } catch (orderByError) {
+        console.log('OrderBy query failed in getMinDate, falling back to simple query:', orderByError);
+        // Fallback: get all cones and find minimum date in memory
+        const querySnapshot = await conesRef.where('userId', '==', userId).get();
+        
+        if (querySnapshot.empty) return null;
+        
+        let minDate: string | null = null;
+        querySnapshot.forEach((docSnapshot: any) => {
+          const data = docSnapshot.data();
+          if (!minDate || data.date < minDate) {
+            minDate = data.date;
+          }
+        });
+        
+        return minDate;
+      }
+    } catch (error) {
+      console.error('Error in getMinDate:', error);
+      throw error;
     }
   }
 
   async getStats(userId: string): Promise<ConeStats> {
-    const now = new Date();
-    const pad2 = (n: number) => String(n).padStart(2, '0');
-    const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-    
-    // Get start of week (Monday)
-    const startOfWeek = new Date(now);
-    const weekday = (now.getDay() + 6) % 7; // Monday=0, Sunday=6
-    startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(now.getDate() - weekday);
-    const weekStart = `${startOfWeek.getFullYear()}-${pad2(startOfWeek.getMonth() + 1)}-${pad2(startOfWeek.getDate())}`;
-    
-    // Get start of month
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    try {
+      const now = new Date();
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+      
+      // Get start of week (Monday)
+      const startOfWeek = new Date(now);
+      const weekday = (now.getDay() + 6) % 7; // Monday=0, Sunday=6
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(now.getDate() - weekday);
+      const weekStart = `${startOfWeek.getFullYear()}-${pad2(startOfWeek.getMonth() + 1)}-${pad2(startOfWeek.getDate())}`;
+      
+      // Get start of month
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-    const [total, todayCount, weekCount, monthCount, minDateStr] = await Promise.all([
-      this.getCount('SELECT COUNT(*) as count FROM cones WHERE user_id = $1', [userId]),
-      this.getCount('SELECT COUNT(*) as count FROM cones WHERE user_id = $1 AND date = $2', [userId, today]),
-      this.getCount('SELECT COUNT(*) as count FROM cones WHERE user_id = $1 AND date >= $2', [userId, weekStart]),
-      this.getCount('SELECT COUNT(*) as count FROM cones WHERE user_id = $1 AND date >= $2', [userId, monthStart]),
-      this.getMinDate(userId)
-    ]);
+      const [total, todayCount, weekCount, monthCount, minDateStr] = await Promise.all([
+        this.getCount('userId', '==', userId),
+        this.getCount('userId', '==', userId, 'date', '==', today),
+        this.getCount('userId', '==', userId, 'date', '>=', weekStart),
+        this.getCount('userId', '==', userId, 'date', '>=', monthStart),
+        this.getMinDate(userId)
+      ]);
 
-    // Calculate averages
-    let averagePerDay = 0;
-    let averagePerWeek = 0;
-    let averagePerMonth = 0;
+      // Calculate averages
+      let averagePerDay = 0;
+      let averagePerWeek = 0;
+      let averagePerMonth = 0;
 
-    if (minDateStr && total > 0) {
-      const startDate = new Date(minDateStr);
-      const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const weeksDiff = Math.max(1, Math.ceil(daysDiff / 7));
-      const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
+      if (minDateStr && total > 0) {
+        const startDate = new Date(minDateStr);
+        const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const weeksDiff = Math.max(1, Math.ceil(daysDiff / 7));
+        const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
 
-      averagePerDay = total / daysDiff;
-      averagePerWeek = total / weeksDiff;
-      averagePerMonth = total / monthsDiff;
+        averagePerDay = total / daysDiff;
+        averagePerWeek = total / weeksDiff;
+        averagePerMonth = total / monthsDiff;
+      }
+
+      return {
+        total,
+        today: todayCount,
+        thisWeek: weekCount,
+        thisMonth: monthCount,
+        averagePerDay,
+        averagePerWeek,
+        averagePerMonth
+      };
+    } catch (error) {
+      console.error('Error in getStats:', error);
+      throw error;
     }
-
-    return {
-      total,
-      today: todayCount,
-      thisWeek: weekCount,
-      thisMonth: monthCount,
-      averagePerDay,
-      averagePerWeek,
-      averagePerMonth
-    };
   }
 
   async getAnalysis(userId: string): Promise<TimeAnalysis> {
-    const client = await this.pool.connect();
-    try {
-      // Get hour of day analysis
-      const hourResult = await client.query(
-        `SELECT 
-           EXTRACT(HOUR FROM timestamp::timestamp) as hour,
-           COUNT(*) as count
-         FROM cones 
-         WHERE user_id = $1 
-         GROUP BY EXTRACT(HOUR FROM timestamp::timestamp)
-         ORDER BY hour`,
-        [userId]
-      );
+    const conesRef = this.db.collection('cones');
+    const querySnapshot = await conesRef.where('userId', '==', userId).get();
+    
+    const hourOfDay: { [hour: number]: number } = {};
+    const dayOfWeek: { [day: string]: number } = {};
+    const monthOfYear: { [month: number]: number } = {};
 
-      // Get day of week analysis
-      const dayResult = await client.query(
-        `SELECT day_of_week, COUNT(*) as count
-         FROM cones 
-         WHERE user_id = $1 
-         GROUP BY day_of_week
-         ORDER BY 
-           CASE day_of_week 
-             WHEN 'Monday' THEN 1
-             WHEN 'Tuesday' THEN 2
-             WHEN 'Wednesday' THEN 3
-             WHEN 'Thursday' THEN 4
-             WHEN 'Friday' THEN 5
-             WHEN 'Saturday' THEN 6
-             WHEN 'Sunday' THEN 7
-           END`,
-        [userId]
-      );
+    querySnapshot.forEach((docSnapshot: any) => {
+      const data = docSnapshot.data();
+      const timestamp = new Date(data.timestamp);
+      
+      // Hour of day analysis
+      const hour = timestamp.getHours();
+      hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
+      
+      // Day of week analysis
+      const day = data.dayOfWeek;
+      dayOfWeek[day] = (dayOfWeek[day] || 0) + 1;
+      
+      // Month of year analysis
+      const month = timestamp.getMonth() + 1;
+      monthOfYear[month] = (monthOfYear[month] || 0) + 1;
+    });
 
-      // Get month of year analysis
-      const monthResult = await client.query(
-        `SELECT 
-           EXTRACT(MONTH FROM timestamp::timestamp) as month,
-           COUNT(*) as count
-         FROM cones 
-         WHERE user_id = $1 
-         GROUP BY EXTRACT(MONTH FROM timestamp::timestamp)
-         ORDER BY month`,
-        [userId]
-      );
-
-      // Convert to expected format
-      const hourOfDay: { [hour: number]: number } = {};
-      hourResult.rows.forEach((row: any) => {
-        hourOfDay[parseInt(row.hour)] = parseInt(row.count);
-      });
-
-      const dayOfWeek: { [day: string]: number } = {};
-      dayResult.rows.forEach((row: any) => {
-        dayOfWeek[row.day_of_week] = parseInt(row.count);
-      });
-
-      const monthOfYear: { [month: number]: number } = {};
-      monthResult.rows.forEach((row: any) => {
-        monthOfYear[parseInt(row.month)] = parseInt(row.count);
-      });
-
-      return { hourOfDay, dayOfWeek, monthOfYear };
-    } finally {
-      client.release();
-    }
+    return { hourOfDay, dayOfWeek, monthOfYear };
   }
 
-  private async getCount(sql: string, params: any[] = []): Promise<number> {
-    const client = await this.pool.connect();
+  private async getCount(field1: string, op1: string, value1: any, field2?: string, op2?: string, value2?: any): Promise<number> {
     try {
-      const result = await client.query(sql, params);
-      return parseInt(result.rows[0].count);
-    } finally {
-      client.release();
+      const conesRef = this.db.collection('cones');
+      let q: any;
+      
+      if (field2 && op2 && value2 !== undefined) {
+        q = conesRef.where(field1, op1 as any, value1).where(field2, op2 as any, value2);
+      } else {
+        q = conesRef.where(field1, op1 as any, value1);
+      }
+      
+      const querySnapshot = await q.get();
+      return querySnapshot.size;
+    } catch (error) {
+      console.error('Error in getCount:', error, { field1, op1, value1, field2, op2, value2 });
+      throw error;
     }
   }
 
@@ -439,31 +391,38 @@ export class Database {
     };
   }
 
-  async importData(userId: string, data: ExportData): Promise<{ success: boolean; message: string; importedCount?: number }> {
-    const client = await this.pool.connect();
+  async importData(userId: string, data: any): Promise<{ success: boolean; message: string; importedCount?: number }> {
     try {
-      await client.query('BEGIN');
-
+      const batch = this.db.batch();
+      const conesRef = this.db.collection('cones');
+      
       let importedCount = 0;
-      for (const cone of data.cones) {
-        await client.query(
-          `INSERT INTO cones (user_id, timestamp, date, time, day_of_week, notes, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [
-            userId,
-            cone.timestamp,
-            cone.date,
-            cone.time,
-            cone.dayOfWeek,
-            cone.notes || null,
-            cone.createdAt,
-            cone.updatedAt
-          ]
-        );
+      
+      // Handle both old and new data formats
+      const cones = data.cones || [];
+      
+      for (const cone of cones) {
+        const docRef = conesRef.doc();
+        
+        // Clean and normalize the cone data
+        const cleanCone = {
+          timestamp: cone.timestamp,
+          date: cone.date,
+          time: cone.time,
+          dayOfWeek: cone.dayOfWeek,
+          notes: cone.notes || '',
+          createdAt: cone.createdAt || cone.timestamp || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          userId
+        };
+        
+        batch.set(docRef, cleanCone);
         importedCount++;
       }
 
-      await client.query('COMMIT');
+      if (importedCount > 0) {
+        await batch.commit();
+      }
 
       return {
         success: true,
@@ -471,14 +430,15 @@ export class Database {
         importedCount
       };
     } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      console.error('Error importing data:', error);
+      return {
+        success: false,
+        message: `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
     }
   }
 
   async close(): Promise<void> {
-    await this.pool.end();
+    // Firestore doesn't require explicit connection closing
   }
 }

@@ -24,9 +24,24 @@ root.render(
   </React.StrictMode>
 );
 
-// Register service worker (only in production)
+// Temporarily disable service worker to fix API issues
+// TODO: Re-enable with proper configuration later
+/*
 if ('serviceWorker' in navigator) {
-	window.addEventListener('load', () => {
-		navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+	window.addEventListener('load', async () => {
+		try {
+			// Unregister any existing service workers first
+			const registrations = await navigator.serviceWorker.getRegistrations();
+			for (const registration of registrations) {
+				await registration.unregister();
+			}
+			
+			// Register the new service worker
+			await navigator.serviceWorker.register('/service-worker.js');
+			console.log('Service worker registered successfully');
+		} catch (error) {
+			console.log('Service worker registration failed:', error);
+		}
 	});
 }
+*/

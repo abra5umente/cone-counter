@@ -8,7 +8,7 @@ import {
   onAuthStateChanged,
   UserCredential
 } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { getFirebaseAuth, getGoogleProvider } from '../firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -36,35 +36,65 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseReady, setFirebaseReady] = useState(false);
+
+  // Wait for Firebase to be ready
+  useEffect(() => {
+    const checkFirebase = () => {
+      const auth = getFirebaseAuth();
+      if (auth) {
+        setFirebaseReady(true);
+      } else {
+        // Check again in a moment
+        setTimeout(checkFirebase, 100);
+      }
+    };
+    
+    checkFirebase();
+  }, []);
 
   function signUp(email: string, password: string) {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error('Firebase not initialized');
     return createUserWithEmailAndPassword(auth, email, password);
   }
 
   function signIn(email: string, password: string) {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error('Firebase not initialized');
     return signInWithEmailAndPassword(auth, email, password);
   }
 
   function signInWithGoogle() {
+    const auth = getFirebaseAuth();
+    const googleProvider = getGoogleProvider();
+    if (!auth || !googleProvider) throw new Error('Firebase not initialized');
     return signInWithPopup(auth, googleProvider);
   }
 
   function logout() {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error('Firebase not initialized');
     return signOut(auth);
   }
 
   useEffect(() => {
+    if (!firebaseReady) return;
+
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [firebaseReady]);
 
   const value = {
     currentUser,
-    loading,
+    loading: loading || !firebaseReady,
     signIn,
     signUp,
     signInWithGoogle,
@@ -73,7 +103,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {!loading && firebaseReady && children}
     </AuthContext.Provider>
   );
 }

@@ -2,7 +2,7 @@
 
 This guide covers deploying Cone Counter in various environments, from local development to production.
 
-## 🚀 Quick Deployment
+## Quick Deployment
 
 ### Using Docker Compose (Recommended)
 
@@ -27,12 +27,11 @@ docker build -t alexschladetsch/cone-counter:latest .
 docker run -d \
   --name cone-counter \
   -p 3000:3000 \
-  -v cone-data:/app/data \
   --restart unless-stopped \
   alexschladetsch/cone-counter:latest
 ```
 
-## 🐳 Docker Configuration
+## Docker Configuration
 
 ### Dockerfile Overview
 
@@ -59,11 +58,16 @@ docker buildx build --platform linux/amd64,linux/arm64 -t cone-counter:multi .
 PORT=3000                    # Server port (default: 3000)
 NODE_ENV=production         # Environment mode (default: production)
 
-# Database configuration (auto-configured)
-# SQLite database stored in /app/data/cones.db
+# Firebase configuration (required)
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+FIREBASE_CLIENT_ID=your-client-id
+FIREBASE_PRIVATE_KEY_ID=your-private-key-id
+FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/...
 ```
 
-## 🏗️ Production Deployment
+## Production Deployment
 
 ### Single Server Deployment
 
@@ -71,15 +75,12 @@ NODE_ENV=production         # Environment mode (default: production)
 # 1. Build production image
 docker build -t alexschladetsch/cone-counter:latest .
 
-# 2. Create persistent volume
-docker volume create cone-data
-
-# 3. Run with production settings
+# 2. Run with production settings
 docker run -d \
   --name cone-counter \
   -p 3000:3000 \
-  -v cone-data:/app/data \
   --restart unless-stopped \
+  --env-file backend.env \
   --health-cmd="curl -f http://localhost:3000/api/stats || exit 1" \
   --health-interval=30s \
   --health-timeout=10s \
@@ -97,8 +98,8 @@ services:
     image: alexschladetsch/cone-counter:latest
     ports:
       - "3000:3000"
-    volumes:
-      - cone-data:/app/data
+    env_file:
+      - backend.env
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -109,10 +110,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  cone-data:
-    driver: local
 ```
 
 ### Multi-Architecture Deployment
@@ -126,10 +123,10 @@ docker buildx build \
 
 # Pull and run on target architecture
 docker pull alexschladetsch/cone-counter:latest
-docker run -d -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
+docker run -d -p 3000:3000 --env-file backend.env alexschladetsch/cone-counter:latest
 ```
 
-## 🌐 Reverse Proxy Setup
+## Reverse Proxy Setup
 
 ### Nginx Configuration
 
@@ -178,8 +175,8 @@ version: '3.8'
 services:
   cone-counter:
     image: alexschladetsch/cone-counter:latest
-    volumes:
-      - cone-data:/app/data
+    env_file:
+      - backend.env
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.cone-counter.rule=Host(`your-domain.com`)"
@@ -187,13 +184,9 @@ services:
       - "traefik.http.routers.cone-counter.tls.certresolver=letsencrypt"
       - "traefik.http.services.cone-counter.loadbalancer.server.port=3000"
     restart: unless-stopped
-
-volumes:
-  cone-data:
-    driver: local
 ```
 
-## 📊 Monitoring and Health Checks
+## Monitoring and Health Checks
 
 ### Health Check Endpoint
 
@@ -230,51 +223,41 @@ docker logs -f cone-counter
 docker logs -t cone-counter
 ```
 
-## 💾 Data Management
+## Data Management
 
 ### Backup Strategy
 
 ```bash
-# 1. Stop the application
-docker stop cone-counter
+# Export data via API (requires authentication)
+curl -H "Authorization: Bearer <firebase-id-token>" \
+  http://localhost:3000/api/export > backup.json
 
-# 2. Backup the data volume
-docker run --rm -v cone-data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/cone-counter-backup-$(date +%Y%m%d).tar.gz -C /data .
-
-# 3. Restart the application
-docker start cone-counter
+# Or use Firebase Console for manual backup
 ```
 
 ### Data Migration
 
 ```bash
 # Export current data
-curl http://localhost:3000/api/export > backup.json
+curl -H "Authorization: Bearer <firebase-id-token>" \
+  http://localhost:3000/api/export > backup.json
 
 # Import to new instance
 curl -X POST http://new-instance:3000/api/import \
+  -H "Authorization: Bearer <firebase-id-token>" \
   -H "Content-Type: application/json" \
   -d @backup.json
 ```
 
-### Volume Management
+### Firebase Data Management
 
 ```bash
-# List volumes
-docker volume ls
-
-# Inspect volume details
-docker volume inspect cone-data
-
-# Remove volume (WARNING: destroys all data)
-docker volume rm cone-data
-
-# Create new volume
-docker volume create cone-data
+# Data is automatically managed by Firebase
+# No local volume management required
+# Use Firebase Console for data inspection and management
 ```
 
-## 🔒 Security Considerations
+## Security Considerations
 
 ### Production Security
 
@@ -282,6 +265,7 @@ docker volume create cone-data
 2. **Firewall**: Restrict access to necessary ports only
 3. **Updates**: Regularly update base images and dependencies
 4. **Monitoring**: Implement logging and alerting
+5. **Firebase Security Rules**: Configure proper Firestore security rules
 
 ### Network Security
 
@@ -296,11 +280,13 @@ docker run --network host \
 ### Data Security
 
 ```bash
-# Encrypt data volume (example with LUKS)
-# This requires additional setup and is OS-dependent
+# Firebase provides built-in security
+# Configure Firestore security rules
+# Use Firebase Auth for user authentication
+# Service account keys are encrypted and secure
 ```
 
-## 📱 Load Balancing
+## Load Balancing
 
 ### Multiple Instances
 
@@ -310,30 +296,24 @@ version: '3.8'
 services:
   cone-counter-1:
     image: alexschladetsch/cone-counter:latest
-    volumes:
-      - cone-data-1:/app/data
+    env_file:
+      - backend.env
     environment:
       - NODE_ENV=production
       - PORT=3000
 
   cone-counter-2:
     image: alexschladetsch/cone-counter:latest
-    volumes:
-      - cone-data-2:/app/data
+    env_file:
+      - backend.env
     environment:
       - NODE_ENV=production
       - PORT=3000
-
-volumes:
-  cone-data-1:
-    driver: local
-  cone-data-2:
-    driver: local
 ```
 
-**Note**: Multiple instances require shared database or data synchronization strategy.
+**Note**: Multiple instances can share the same Firebase project and data.
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -346,16 +326,20 @@ volumes:
    docker run -p 3001:3000 alexschladetsch/cone-counter:latest
    ```
 
-2. **Permission Denied**
+2. **Firebase Connection Issues**
    ```bash
-   # Fix volume permissions
-   sudo chown -R 1001:1001 /path/to/data
+   # Check environment variables
+   docker exec cone-counter env | grep FIREBASE
+   
+   # Verify Firebase project configuration
+   # Check service account permissions
    ```
 
-3. **Database Locked**
+3. **Authentication Errors**
    ```bash
-   # Restart container
-   docker restart cone-counter
+   # Verify Firebase Auth is enabled
+   # Check Firestore security rules
+   # Ensure proper token format
    ```
 
 4. **Memory Issues**
@@ -374,7 +358,7 @@ docker run -e NODE_ENV=development alexschladetsch/cone-counter:latest
 docker run -it --entrypoint /bin/sh alexschladetsch/cone-counter:latest
 ```
 
-## 🔄 Updates and Maintenance
+## Updates and Maintenance
 
 ### Rolling Updates
 
@@ -389,7 +373,7 @@ docker stop cone-counter
 docker rm cone-counter
 
 # 4. Start new container
-docker run -d --name cone-counter -p 3000:3000 -v cone-data:/app/data alexschladetsch/cone-counter:latest
+docker run -d --name cone-counter -p 3000:3000 --env-file backend.env alexschladetsch/cone-counter:latest
 ```
 
 ### Automated Updates
@@ -404,28 +388,31 @@ docker run -d \
   cone-counter
 ```
 
-## 📋 Deployment Checklist
+## Deployment Checklist
 
 - [ ] Build and test Docker image locally
-- [ ] Configure environment variables
-- [ ] Set up persistent data volume
+- [ ] Configure Firebase environment variables
+- [ ] Set up Firebase project and service account
 - [ ] Configure reverse proxy (if needed)
 - [ ] Set up SSL certificates
 - [ ] Configure firewall rules
 - [ ] Test health check endpoint
-- [ ] Verify data persistence
+- [ ] Verify Firebase connectivity
 - [ ] Set up monitoring and logging
 - [ ] Document deployment configuration
 - [ ] Plan backup and recovery procedures
+- [ ] Configure Firestore security rules
 
-## 📚 Additional Resources
+## Additional Resources
 
 - **Docker Documentation**: https://docs.docker.com/
 - **Nginx Configuration**: https://nginx.org/en/docs/
 - **Traefik Documentation**: https://doc.traefik.io/
 - **SSL Certificates**: https://letsencrypt.org/
+- **Firebase Documentation**: https://firebase.google.com/docs
+- **Firestore Security Rules**: https://firebase.google.com/docs/firestore/security/get-started
 
 ---
 
-**Deployment Version**: 1.0.0  
+**Deployment Version**: 2.0.0  
 **Last Updated**: January 2025

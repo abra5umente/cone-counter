@@ -2,18 +2,19 @@
 
 This document is designed to help AI agents and developers understand the Cone Counter codebase, its architecture, and how to work with it effectively.
 
-## 🎯 Project Overview
+## Project Overview
 
-**Cone Counter** is a web application for tracking and analyzing bong/cone usage over time. It's built with TypeScript, React, Node.js, and SQLite, all containerized in a single Docker image.
+**Cone Counter** is a web application for tracking and analyzing bong/cone usage over time. It's built with TypeScript, React, Node.js, and Firebase Firestore, all containerized in a single Docker image.
 
 ### Key Features
-- **📊 Real-time Statistics**: Track total cones, daily/weekly/monthly counts, and averages
-- **📈 Analytics & Trends**: Visualize usage patterns by hour, day of week, and month
-- **✏️ Edit & Manage**: Modify existing entries with timestamps and notes
-- **💾 Persistent Storage**: SQLite database with automatic data persistence
-- **🌍 Timezone Aware**: Consistent local time handling across all displays and statistics
+- **Real-time Statistics**: Track total cones, daily/weekly/monthly counts, and averages
+- **Analytics & Trends**: Visualize usage patterns by hour, day of week, and month
+- **Edit & Manage**: Modify existing entries with timestamps and notes
+- **Cloud Storage**: Firebase Firestore database with automatic scaling and real-time sync
+- **User Authentication**: Secure Google Sign-in with Firebase Auth
+- **Timezone Aware**: Consistent local time handling across all displays and statistics
 
-## 🏗️ Architecture Patterns
+## Architecture Patterns
 
 ### Single Container Design
 The application uses a **single container architecture** where the Node.js backend serves both:
@@ -22,23 +23,39 @@ The application uses a **single container architecture** where the Node.js backe
 
 This design simplifies deployment and ensures consistency between frontend and backend.
 
-### Database Schema
-```sql
-CREATE TABLE cones (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  timestamp TEXT NOT NULL,        -- ISO string in UTC
-  date TEXT NOT NULL,             -- YYYY-MM-DD in local time
-  time TEXT NOT NULL,             -- HH:MM:SS in local time
-  dayOfWeek TEXT NOT NULL,        -- Day name in local time
-  notes TEXT,                     -- Optional user notes
-  createdAt TEXT NOT NULL,        -- ISO string
-  updatedAt TEXT NOT NULL         -- ISO string
-);
+### Database Schema (Firestore Collections)
+
+#### Users Collection
+```typescript
+// Collection: 'users'
+// Document ID: Firebase Auth UID
+{
+  email: string,
+  displayName?: string,
+  createdAt: string,     // ISO string
+  updatedAt: string      // ISO string
+}
 ```
 
-**Key Insight**: The app stores UTC timestamps but derives local time fields for display and analysis.
+#### Cones Collection
+```typescript
+// Collection: 'cones'
+// Document ID: Auto-generated Firestore ID
+{
+  userId: string,        // References user document ID
+  timestamp: string,     // ISO string in UTC
+  date: string,          // YYYY-MM-DD in local time
+  time: string,          // HH:MM:SS in local time
+  dayOfWeek: string,     // Day name in local time
+  notes?: string,        // Optional user notes
+  createdAt: string,     // ISO string
+  updatedAt: string      // ISO string
+}
+```
 
-## 🌍 Timezone Handling (Critical Pattern)
+**Key Insight**: The app stores UTC timestamps but derives local time fields for display and analysis. Each cone document is linked to a user via the `userId` field.
+
+## Timezone Handling (Critical Pattern)
 
 ### The Problem Solved
 The original implementation had a timezone bug where dates near midnight could display as the previous day due to UTC vs local time conversion.
@@ -63,13 +80,14 @@ const dateStr = date.toISOString().split('T')[0]; // Could be wrong day
 const dateStr = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 ```
 
-## 📁 Codebase Structure
+## Codebase Structure
 
 ### Backend (`src/`)
 ```
 src/
-├── database.ts        # Database operations, SQLite schema, normalization
+├── database.ts        # Database operations, Firestore schema, normalization
 ├── server.ts          # Express server, API endpoints, timezone handling
+├── firebase-admin.ts  # Firebase Admin SDK configuration
 └── types.ts           # TypeScript interfaces and types
 ```
 
@@ -88,7 +106,7 @@ frontend/src/
 └── types.ts           # Frontend type definitions
 ```
 
-## 🔑 Key Development Patterns
+## Key Development Patterns
 
 ### 1. TypeScript First
 - All functions have explicit return types
@@ -102,10 +120,11 @@ frontend/src/
 - Dark mode support via Tailwind `dark:` modifiers
 
 ### 3. Database Patterns
-- Parameterized queries to prevent SQL injection
-- Prepared statements for all operations
+- Firestore security rules for data protection
+- Document-based operations with collections
 - Automatic timestamp management (`createdAt`, `updatedAt`)
-- Startup normalization for data consistency
+- Batch operations for consistency
+- User-scoped data access (all cones filtered by `userId`)
 
 ### 4. API Patterns
 - RESTful endpoints under `/api/*`
@@ -113,17 +132,17 @@ frontend/src/
 - JSON responses with proper HTTP status codes
 - CORS enabled for development flexibility
 
-## 🚨 Common Pitfalls & Solutions
+## Common Pitfalls & Solutions
 
 ### 1. Timezone Issues
 **Problem**: Dates showing wrong day
 **Solution**: Always use the `timestamp` field for display, derive local fields in backend
 **Prevention**: Test with entries near midnight
 
-### 2. Database Locking
-**Problem**: SQLite database locked errors
-**Solution**: Use prepared statements and proper error handling
-**Prevention**: Check connection handling in `database.ts`
+### 2. Firestore Connection Issues
+**Problem**: Firestore connection errors (Error: 5 NOT_FOUND)
+**Solution**: Verify Firebase project configuration and service account credentials
+**Prevention**: Check Firebase Admin SDK initialization in `firebase-admin.ts`
 
 ### 3. Build Failures
 **Problem**: Frontend build errors
@@ -131,11 +150,11 @@ frontend/src/
 **Prevention**: Keep dependencies up to date
 
 ### 4. Docker Issues
-**Problem**: Container won't start or data not persisting
-**Solution**: Check volume mounts and permissions
-**Prevention**: Use `docker-compose up -d` for consistent setup
+**Problem**: Container won't start or Firebase credentials not loading
+**Solution**: Check environment variables and Firebase configuration
+**Prevention**: Ensure `.env` file is properly formatted and Firebase project is set up
 
-## 🧪 Testing Strategies
+## Testing Strategies
 
 ### Manual Testing Checklist
 - [ ] Add new cone with current time
@@ -159,10 +178,10 @@ cd frontend && npm start  # Start frontend
 
 # Full stack testing
 docker build -t cone-counter:test .
-docker run -d -p 3000:3000 -v cone-data:/app/data cone-counter:test
+docker run -d -p 3000:3000 cone-counter:test
 ```
 
-## 🔧 Development Workflow
+## Development Workflow
 
 ### Making Changes
 1. **Understand the Pattern**: Study existing code for the pattern you're implementing
@@ -179,7 +198,7 @@ docker run -d -p 3000:3000 -v cone-data:/app/data cone-counter:test
 - [ ] Error handling is comprehensive
 - [ ] Tests cover edge cases
 
-## 📚 Key Files to Study
+## Key Files to Study
 
 ### For Backend Changes
 1. **`src/server.ts`** - API endpoints and timezone logic
@@ -193,11 +212,12 @@ docker run -d -p 3000:3000 -v cone-data:/app/data cone-counter:test
 4. **`frontend/src/types.ts`** - Frontend type definitions
 
 ### For Database Changes
-1. **`src/database.ts`** - Schema and migration logic
-2. **`src/server.ts`** - API endpoint implementations
-3. **`src/types.ts`** - Data structure definitions
+1. **`src/database.ts`** - Firestore operations and data normalization
+2. **`src/firebase-admin.ts`** - Firebase Admin SDK configuration
+3. **`src/server.ts`** - API endpoint implementations
+4. **`src/types.ts`** - Data structure definitions
 
-## 🌟 Best Practices
+## Best Practices
 
 ### 1. Timezone Handling
 - Always store UTC timestamps
@@ -212,18 +232,19 @@ docker run -d -p 3000:3000 -v cone-data:/app/data cone-counter:test
 - Handle edge cases gracefully
 
 ### 3. Performance
-- Use database indexes for frequently queried fields
-- Implement pagination for large datasets
+- Use Firestore composite indexes for complex queries
+- Implement pagination for large datasets (Firestore has 10k document limit per query)
 - Cache frequently accessed data
-- Optimize database queries
+- Optimize Firestore queries and minimize read operations
 
 ### 4. Security
-- Use parameterized queries
+- Configure Firestore security rules properly
 - Validate all input data
 - Implement proper CORS policies
-- Consider rate limiting for production
+- Use Firebase Auth for user authentication
+- Never commit service account keys to version control
 
-## 🚀 Deployment Considerations
+## Deployment Considerations
 
 ### Docker Commands
 ```bash
@@ -241,13 +262,18 @@ docker logs cone-counter
 ### Environment Variables
 - `PORT`: Server port (default: 3000)
 - `NODE_ENV`: Environment mode (default: production)
+- `FIREBASE_PROJECT_ID`: Firebase project ID
+- `FIREBASE_PRIVATE_KEY`: Service account private key
+- `FIREBASE_CLIENT_EMAIL`: Service account email
+- (See `backend.env.example` for complete list)
 
 ### Data Persistence
-- SQLite database stored in `/app/data/cones.db`
-- Use Docker volumes for data persistence
+- Firebase Firestore cloud database (no local storage needed)
+- Automatic scaling and real-time synchronization
 - Backup strategy: export via `/api/export` endpoint
+- Data is automatically replicated across Firebase infrastructure
 
-## 🤝 Contributing Guidelines
+## Contributing Guidelines
 
 ### Code Style
 - Use descriptive variable names
@@ -267,7 +293,7 @@ docker logs cone-counter
 - Document any new API endpoints
 - Update deployment guides if needed
 
-## 📞 Getting Help
+## Getting Help
 
 ### When You're Stuck
 1. **Check the Documentation**: README.md, API.md, DEPLOYMENT.md
@@ -283,10 +309,13 @@ docker logs cone-counter
 - **A**: Follow the pattern in `src/server.ts`, update types, test thoroughly
 
 - **Q**: How do I modify the database schema?
-- **A**: Update `src/database.ts`, add migration logic, test with sample data
+- **A**: Update Firestore collections in `src/database.ts`, update TypeScript interfaces, test with sample data
+
+- **Q**: How do I set up Firebase for development?
+- **A**: Create Firebase project, enable Firestore and Auth, generate service account key, configure environment variables
 
 ---
 
 **Remember**: The timezone handling is critical to the application's functionality. Always test date-related changes thoroughly, especially around midnight boundaries.
 
-**Happy coding! 🚬📊**
+**Happy coding!**

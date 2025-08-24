@@ -2,23 +2,27 @@
 
 This document describes the REST API endpoints for the Cone Counter application.
 
-## 🌐 Base URL
+## Base URL
 
 - **Development**: `http://localhost:3000`
 - **Production**: `http://your-domain:3000`
 
-## 🔐 Authentication
+## Authentication
 
-Currently, no authentication is required. All endpoints are publicly accessible.
+All API endpoints require Firebase authentication. Include the Firebase ID token in the Authorization header:
 
-## 📊 Response Format
+```
+Authorization: Bearer <firebase-id-token>
+```
+
+## Response Format
 
 All API responses are in JSON format. Successful responses include the requested data, while error responses include an `error` field with a descriptive message.
 
 ### Success Response
 ```json
 {
-  "id": 1,
+  "id": "firestore-doc-id",
   "timestamp": "2025-01-20T09:16:00.000Z",
   "date": "2025-01-20",
   "time": "09:16:00",
@@ -32,23 +36,24 @@ All API responses are in JSON format. Successful responses include the requested
 ### Error Response
 ```json
 {
-  "error": "Failed to fetch cone"
+  "error": "Failed to fetch cone",
+  "details": "Detailed error message"
 }
 ```
 
-## 🚬 Cone Endpoints
+## Cone Endpoints
 
 ### Get All Cones
 
 **GET** `/api/cones`
 
-Retrieves all cones ordered by timestamp (newest first).
+Retrieves all cones for the authenticated user, ordered by timestamp (newest first).
 
 **Response:**
 ```json
 [
   {
-    "id": 1,
+    "id": "firestore-doc-id",
     "timestamp": "2025-01-20T09:16:00.000Z",
     "date": "2025-01-20",
     "time": "09:16:00",
@@ -67,12 +72,12 @@ Retrieves all cones ordered by timestamp (newest first).
 Retrieves a specific cone by its ID.
 
 **Parameters:**
-- `id` (path): Cone ID (integer)
+- `id` (path): Cone ID (Firestore document ID)
 
 **Response:**
 ```json
 {
-  "id": 1,
+  "id": "firestore-doc-id",
   "timestamp": "2025-01-20T09:16:00.000Z",
   "date": "2025-01-20",
   "time": "09:16:00",
@@ -84,6 +89,7 @@ Retrieves a specific cone by its ID.
 ```
 
 **Error Responses:**
+- `401`: Unauthorized (invalid or missing token)
 - `404`: Cone not found
 - `500`: Server error
 
@@ -91,7 +97,7 @@ Retrieves a specific cone by its ID.
 
 **POST** `/api/cones`
 
-Creates a new cone entry.
+Creates a new cone entry for the authenticated user.
 
 **Request Body:**
 ```json
@@ -105,11 +111,12 @@ Creates a new cone entry.
 - If `timestamp` is not provided, the current time will be used
 - `timestamp` should be in ISO 8601 format
 - The server automatically derives `date`, `time`, and `dayOfWeek` from the timestamp in local time
+- The cone is automatically associated with the authenticated user
 
 **Response:**
 ```json
 {
-  "id": 2,
+  "id": "firestore-doc-id",
   "timestamp": "2025-01-20T09:16:00.000Z",
   "date": "2025-01-20",
   "time": "09:16:00",
@@ -121,6 +128,7 @@ Creates a new cone entry.
 ```
 
 **Error Responses:**
+- `401`: Unauthorized (invalid or missing token)
 - `400`: Invalid request data
 - `500`: Server error
 
@@ -131,7 +139,7 @@ Creates a new cone entry.
 Updates an existing cone entry.
 
 **Parameters:**
-- `id` (path): Cone ID (integer)
+- `id` (path): Cone ID (Firestore document ID)
 
 **Request Body:**
 ```json
@@ -145,11 +153,12 @@ Updates an existing cone entry.
 - Only provide the fields you want to update
 - If `timestamp` is updated, `date`, `time`, and `dayOfWeek` are automatically recalculated
 - `updatedAt` is automatically set to the current time
+- Users can only update their own cones
 
 **Response:**
 ```json
 {
-  "id": 1,
+  "id": "firestore-doc-id",
   "timestamp": "2025-01-20T10:00:00.000Z",
   "date": "2025-01-20",
   "time": "10:00:00",
@@ -161,6 +170,7 @@ Updates an existing cone entry.
 ```
 
 **Error Responses:**
+- `401`: Unauthorized (invalid or missing token)
 - `404`: Cone not found
 - `400`: Invalid update data
 - `500`: Server error
@@ -172,7 +182,7 @@ Updates an existing cone entry.
 Deletes a cone entry.
 
 **Parameters:**
-- `id` (path): Cone ID (integer)
+- `id` (path): Cone ID (Firestore document ID)
 
 **Response:**
 ```json
@@ -182,6 +192,7 @@ Deletes a cone entry.
 ```
 
 **Error Responses:**
+- `401`: Unauthorized (invalid or missing token)
 - `404`: Cone not found
 - `500`: Server error
 
@@ -189,7 +200,7 @@ Deletes a cone entry.
 
 **GET** `/api/cones/range/:start/:end`
 
-Retrieves cones within a specific date range.
+Retrieves cones within a specific date range for the authenticated user.
 
 **Parameters:**
 - `start` (path): Start date in YYYY-MM-DD format
@@ -199,7 +210,7 @@ Retrieves cones within a specific date range.
 ```json
 [
   {
-    "id": 1,
+    "id": "firestore-doc-id",
     "timestamp": "2025-01-20T09:16:00.000Z",
     "date": "2025-01-20",
     "time": "09:16:00",
@@ -211,13 +222,13 @@ Retrieves cones within a specific date range.
 ]
 ```
 
-## 📈 Analytics Endpoints
+## Analytics Endpoints
 
 ### Get Statistics
 
 **GET** `/api/stats`
 
-Retrieves comprehensive usage statistics.
+Retrieves comprehensive usage statistics for the authenticated user.
 
 **Response:**
 ```json
@@ -241,7 +252,7 @@ Retrieves comprehensive usage statistics.
 
 **GET** `/api/analysis`
 
-Retrieves detailed time-based analysis for charts and trends.
+Retrieves detailed time-based analysis for charts and trends for the authenticated user.
 
 **Response:**
 ```json
@@ -274,13 +285,13 @@ Retrieves detailed time-based analysis for charts and trends.
 - `dayOfWeek`: Keys are day names, values are counts
 - `monthOfYear`: Keys are 1-12, values are counts
 
-## 💾 Data Management Endpoints
+## Data Management Endpoints
 
 ### Export Data
 
 **GET** `/api/export`
 
-Exports all application data as a JSON file.
+Exports all application data for the authenticated user as a JSON file.
 
 **Response Headers:**
 - `Content-Type: application/json`
@@ -291,7 +302,7 @@ Exports all application data as a JSON file.
 {
   "cones": [
     {
-      "id": 1,
+      "id": "firestore-doc-id",
       "timestamp": "2025-01-20T09:16:00.000Z",
       "date": "2025-01-20",
       "time": "09:16:00",
@@ -302,7 +313,7 @@ Exports all application data as a JSON file.
     }
   ],
   "exportDate": "2025-01-20T21:00:00.000Z",
-  "version": "1.0.0"
+  "version": "2.0.0"
 }
 ```
 
@@ -310,7 +321,7 @@ Exports all application data as a JSON file.
 
 **POST** `/api/import`
 
-Imports data from a previously exported file.
+Imports data from a previously exported file for the authenticated user.
 
 **Request Body:**
 ```json
@@ -327,14 +338,15 @@ Imports data from a previously exported file.
     }
   ],
   "exportDate": "2025-01-20T21:00:00.000Z",
-  "version": "1.0.0"
+  "version": "2.0.0"
 }
 ```
 
 **Notes:**
-- **Warning**: This operation replaces ALL existing data
-- The `id` field from exported data is ignored (new IDs are assigned)
+- **Warning**: This operation replaces ALL existing data for the authenticated user
+- The `id` field from exported data is ignored (new Firestore document IDs are assigned)
 - All timestamps are validated and normalized
+- Data is automatically associated with the authenticated user
 
 **Response:**
 ```json
@@ -346,10 +358,11 @@ Imports data from a previously exported file.
 ```
 
 **Error Responses:**
+- `401`: Unauthorized (invalid or missing token)
 - `400`: Invalid import data format
 - `500`: Server error
 
-## 🌍 Timezone Handling
+## Timezone Handling
 
 The API ensures consistent timezone handling:
 
@@ -370,33 +383,36 @@ The API ensures consistent timezone handling:
 "dayOfWeek": "Tuesday"    // Local day
 ```
 
-## 🚨 Error Handling
+## Error Handling
 
 ### HTTP Status Codes
 
 - `200`: Success
 - `201`: Created (new resource)
 - `400`: Bad Request (invalid input)
+- `401`: Unauthorized (invalid or missing authentication)
 - `404`: Not Found (resource doesn't exist)
 - `500`: Internal Server Error
 
 ### Common Error Messages
 
+- `"No token provided"`: Missing Authorization header
+- `"Invalid token"`: Firebase token verification failed
 - `"Failed to fetch cones"`: Database query failed
 - `"Cone not found"`: Requested cone ID doesn't exist
 - `"Failed to add cone"`: Database insertion failed
 - `"Failed to update cone"`: Database update failed
 - `"Invalid import data format"`: Import file is malformed
 
-## 📱 Rate Limiting
+## Rate Limiting
 
 Currently, no rate limiting is implemented. However, for production use, consider implementing rate limiting to prevent abuse.
 
-## 🔒 CORS
+## CORS
 
 The API allows cross-origin requests from any origin (`Access-Control-Allow-Origin: *`). This is suitable for development but should be restricted in production.
 
-## 🧪 Testing
+## Testing
 
 ### Health Check
 
@@ -407,30 +423,35 @@ Use this endpoint to verify the API is running and responsive.
 ### cURL Examples
 
 ```bash
-# Get all cones
-curl http://localhost:3000/api/cones
+# Get all cones (requires Firebase ID token)
+curl -H "Authorization: Bearer <firebase-id-token>" \
+  http://localhost:3000/api/cones
 
 # Add a new cone
 curl -X POST http://localhost:3000/api/cones \
+  -H "Authorization: Bearer <firebase-id-token>" \
   -H "Content-Type: application/json" \
   -d '{"notes": "Test cone"}'
 
 # Update a cone
-curl -X PUT http://localhost:3000/api/cones/1 \
+curl -X PUT http://localhost:3000/api/cones/<doc-id> \
+  -H "Authorization: Bearer <firebase-id-token>" \
   -H "Content-Type: application/json" \
   -d '{"notes": "Updated notes"}'
 
 # Delete a cone
-curl -X DELETE http://localhost:3000/api/cones/1
+curl -X DELETE http://localhost:3000/api/cones/<doc-id> \
+  -H "Authorization: Bearer <firebase-id-token>"
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - **Frontend Integration**: See `frontend/src/api.ts` for client-side usage
-- **Database Schema**: See `src/database.ts` for database structure
+- **Database Schema**: See `src/database.ts` for Firestore structure
 - **Server Implementation**: See `src/server.ts` for endpoint implementation
+- **Firebase Setup**: See `FIREBASE_SETUP.md` for authentication configuration
 
 ---
 
-**API Version**: 1.0.0  
+**API Version**: 2.0.0  
 **Last Updated**: January 2025

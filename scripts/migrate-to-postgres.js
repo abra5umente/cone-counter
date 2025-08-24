@@ -30,12 +30,12 @@ const sqliteDb = new sqlite3.Database(sqlitePath);
 const pgPool = new Pool(pgConfig);
 
 async function migrateData() {
-  console.log('🚀 Starting migration from SQLite to PostgreSQL...');
+  console.log('Starting migration from SQLite to PostgreSQL...');
   
   try {
     // Test PostgreSQL connection
     const client = await pgPool.connect();
-    console.log('✅ Connected to PostgreSQL');
+    console.log('Connected to PostgreSQL');
     
     // Check if users table exists and create a default user
     const defaultUserId = 'migrated-user-' + Date.now();
@@ -43,7 +43,7 @@ async function migrateData() {
       'INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
       [defaultUserId, 'migrated@example.com', 'Migrated User']
     );
-    console.log('✅ Created default user for migration');
+    console.log('Created default user for migration');
     
     // Get all cones from SQLite
     const cones = await new Promise((resolve, reject) => {
@@ -53,10 +53,10 @@ async function migrateData() {
       });
     });
     
-    console.log(`📊 Found ${cones.length} cones to migrate`);
+    console.log(`Found ${cones.length} cones to migrate`);
     
     if (cones.length === 0) {
-      console.log('ℹ️  No data to migrate');
+      console.log('No data to migrate');
       return;
     }
     
@@ -84,33 +84,33 @@ async function migrateData() {
         migratedCount++;
         
         if (migratedCount % 100 === 0) {
-          console.log(`📈 Migrated ${migratedCount}/${cones.length} cones...`);
+          console.log(`Migrated ${migratedCount}/${cones.length} cones...`);
         }
       } catch (error) {
-        console.error(`❌ Failed to migrate cone ${cone.id}:`, error);
+        console.error(`Failed to migrate cone ${cone.id}:`, error);
         throw error;
       }
     }
     
     // Commit transaction
     await client.query('COMMIT');
-    console.log(`✅ Successfully migrated ${migratedCount} cones`);
+    console.log(`Successfully migrated ${migratedCount} cones`);
     
     // Verify migration
     const result = await client.query('SELECT COUNT(*) as count FROM cones WHERE user_id = $1', [defaultUserId]);
     const pgCount = parseInt(result.rows[0].count);
-    console.log(`🔍 Verification: PostgreSQL now has ${pgCount} cones`);
+    console.log(`Verification: PostgreSQL now has ${pgCount} cones`);
     
     if (pgCount === cones.length) {
-      console.log('🎉 Migration completed successfully!');
+      console.log('Migration completed successfully!');
     } else {
-      console.warn('⚠️  Migration count mismatch - please verify data integrity');
+      console.warn('Migration count mismatch - please verify data integrity');
     }
     
     client.release();
     
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.error('Migration failed:', error);
     process.exit(1);
   } finally {
     // Close connections
@@ -121,12 +121,12 @@ async function migrateData() {
 
 // Handle errors
 process.on('unhandledRejection', (error) => {
-  console.error('❌ Unhandled rejection:', error);
+  console.error('Unhandled rejection:', error);
   process.exit(1);
 });
 
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Migration interrupted by user');
+  console.log('\nMigration interrupted by user');
   sqliteDb.close();
   await pgPool.end();
   process.exit(0);
@@ -134,6 +134,6 @@ process.on('SIGINT', async () => {
 
 // Run migration
 migrateData().catch((error) => {
-  console.error('❌ Migration failed:', error);
+  console.error('Migration failed:', error);
   process.exit(1);
 });

@@ -1,13 +1,18 @@
 import { Cone, ConeStats, TimeAnalysis, ExportData, ImportResult } from './types';
-import { auth } from './firebase';
+import { getFirebaseAuth } from './firebase';
 
-// Dynamic API base that works from any device
+// Dynamic API base that works from any device and respects the current protocol
 const API_BASE = window.location.hostname === 'localhost' 
   ? 'http://localhost:3000' 
-  : `http://${window.location.hostname}:3000`;
+  : `${window.location.protocol}//${window.location.hostname}`;
 
 // Helper function to get auth headers
 async function getAuthHeaders(): Promise<HeadersInit> {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    throw new Error('Firebase not initialized');
+  }
+  
   const user = auth.currentUser;
   if (!user) {
     throw new Error('User not authenticated');
@@ -33,7 +38,7 @@ export class ConeAPI {
     return response.json();
   }
 
-  static async getCone(id: number): Promise<Cone> {
+  static async getCone(id: string): Promise<Cone> {
     const url = `${API_BASE}/api/cones/${id}`;
     console.log('Fetching cone from:', url);
     const headers = await getAuthHeaders();
@@ -55,7 +60,7 @@ export class ConeAPI {
     return response.json();
   }
 
-  static async updateCone(id: number, updates: Partial<Cone>): Promise<Cone> {
+  static async updateCone(id: string, updates: Partial<Cone>): Promise<Cone> {
     const url = `${API_BASE}/api/cones/${id}`;
     const headers = await getAuthHeaders();
     const response = await fetch(url, {
@@ -67,7 +72,7 @@ export class ConeAPI {
     return response.json();
   }
 
-  static async deleteCone(id: number): Promise<void> {
+  static async deleteCone(id: string): Promise<void> {
     const url = `${API_BASE}/api/cones/${id}`;
     const headers = await getAuthHeaders();
     const response = await fetch(url, {

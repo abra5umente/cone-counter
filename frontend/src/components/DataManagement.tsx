@@ -45,12 +45,20 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onDataImported }
 
     try {
       const text = await file.text();
-      const data: ExportData = JSON.parse(text);
+      const data = JSON.parse(text);
 
-      // Validate data structure
+      // Validate data structure - handle both old and new formats
       if (!data.cones || !Array.isArray(data.cones)) {
         throw new Error('Invalid file format. Please use a valid export file.');
       }
+
+      // Log the data structure for debugging
+      console.log('Import data structure:', {
+        version: data.version,
+        conesLength: data.cones.length,
+        sampleCone: data.cones[0],
+        dataKeys: Object.keys(data)
+      });
 
       // Confirm import
       const coneCount = data.cones.length;

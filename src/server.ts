@@ -100,7 +100,8 @@ app.get('/api/cones', authenticateUser, async (req: AuthenticatedRequest, res) =
     const cones = await db.getAllCones(req.user.uid);
     res.json(cones);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch cones' });
+    console.error('Error fetching cones:', error);
+    res.status(500).json({ error: 'Failed to fetch cones', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -111,7 +112,7 @@ app.get('/api/cones/:id', authenticateUser, async (req: AuthenticatedRequest, re
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const cone = await db.getCone(req.user.uid, id);
     if (!cone) {
       return res.status(404).json({ error: 'Cone not found' });
@@ -166,7 +167,7 @@ app.put('/api/cones/:id', authenticateUser, async (req: AuthenticatedRequest, re
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const updates = req.body;
     
     // Validate cone exists and belongs to user
@@ -205,7 +206,7 @@ app.delete('/api/cones/:id', authenticateUser, async (req: AuthenticatedRequest,
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const success = await db.deleteCone(req.user.uid, id);
     if (!success) {
       return res.status(404).json({ error: 'Cone not found' });
@@ -226,7 +227,8 @@ app.get('/api/stats', authenticateUser, async (req: AuthenticatedRequest, res) =
     const stats = await db.getStats(req.user.uid);
     res.json(stats);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -268,6 +270,12 @@ app.post('/api/import', authenticateUser, async (req: AuthenticatedRequest, res)
     }
     
     const data = req.body;
+    console.log('Import request data:', { 
+      hasCones: !!data.cones, 
+      conesLength: data.cones?.length,
+      dataKeys: Object.keys(data),
+      sampleCone: data.cones?.[0]
+    });
     
     // Validate import data structure
     if (!data.cones || !Array.isArray(data.cones)) {
@@ -275,9 +283,11 @@ app.post('/api/import', authenticateUser, async (req: AuthenticatedRequest, res)
     }
     
     const result = await db.importData(req.user.uid, data);
+    console.log('Import result:', result);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to import data' });
+    console.error('Import endpoint error:', error);
+    res.status(500).json({ error: 'Failed to import data', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -294,6 +304,31 @@ app.get('/api/cones/range/:start/:end', authenticateUser, async (req: Authentica
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch cones by date range' });
   }
+});
+
+// Get Firebase configuration for frontend
+app.get('/api/firebase-config', (req, res) => {
+  const config = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY,
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.VITE_FIREBASE_APP_ID
+  };
+  
+  // Check if all required config values are present
+  const missingVars = Object.entries(config).filter(([key, value]) => !value);
+  
+  if (missingVars.length > 0) {
+    console.error('Missing Firebase config variables:', missingVars.map(([key]) => key));
+    return res.status(500).json({ 
+      error: 'Firebase configuration incomplete',
+      missing: missingVars.map(([key]) => key)
+    });
+  }
+  
+  res.json(config);
 });
 
 // Serve React app for all other routes
@@ -322,7 +357,7 @@ process.on('SIGTERM', async () => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚬 Cone Counter server running on port ${PORT}`);
-  console.log(`🌐 Network accessible at http://0.0.0.0:${PORT}`);
-  console.log(`🗄️ PostgreSQL database initialized`);
+  console.log(`Cone Counter server running on port ${PORT}`);
+  console.log(`Network accessible at http://0.0.0.0:${PORT}`);
+  console.log(`Firebase Firestore database initialized`);
 });

@@ -24,10 +24,10 @@ function initializeFirebaseAdmin() {
         credential: cert(serviceAccount as any),
         projectId: process.env.FIREBASE_PROJECT_ID
       });
-      console.log('✅ Firebase Admin SDK initialized successfully');
+      console.log('Firebase Admin SDK initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize Firebase Admin SDK:', error);
-      console.log('⚠️  Using development mode without Firebase Admin SDK');
+      console.error('Failed to initialize Firebase Admin SDK:', error);
+      console.log('Using development mode without Firebase Admin SDK');
     }
   }
 }

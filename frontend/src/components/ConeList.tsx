@@ -18,7 +18,7 @@ export const ConeList: React.FC<ConeListProps> = ({ cones, onConesChanged }) => 
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this cone?')) {
       try {
         await ConeAPI.deleteCone(id);
