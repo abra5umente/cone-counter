@@ -10,12 +10,6 @@ import { initializeFirebaseAdmin, verifyIdToken } from './firebase-admin';
 const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
-// Debug: Log environment variables
-console.log('Environment variables loaded:');
-console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID);
-console.log('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-
 // Initialize Firebase Admin SDK
 initializeFirebaseAdmin();
 
@@ -46,11 +40,6 @@ app.use((req, res, next) => {
   // Add mobile info to request for logging
   (req as any).isMobile = isMobile;
   
-  // Log mobile requests for debugging
-  if (isMobile) {
-    console.log(`Mobile request: ${req.method} ${req.path} - User-Agent: ${userAgent.substring(0, 100)}...`);
-  }
-  
   next();
 });
 
@@ -72,27 +61,20 @@ async function authenticateUser(req: AuthenticatedRequest, res: express.Response
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('No authorization header or invalid format');
     return res.status(401).json({ error: 'No token provided' });
   }
 
   const token = authHeader.substring(7);
-  console.log('Received token, length:', token.length);
   
   try {
     // Verify the Firebase ID token
-    console.log('Verifying token...');
     const decodedToken = await verifyIdToken(token);
-    console.log('Token verified successfully for user:', decodedToken.uid);
     
     // Get or create user in database
     let user = await db.getUser(decodedToken.uid);
     if (!user) {
-      console.log('Creating new user in database:', decodedToken.uid);
       await db.createUser(decodedToken.uid, decodedToken.email, decodedToken.displayName);
       user = await db.getUser(decodedToken.uid);
-    } else {
-      console.log('User found in database:', decodedToken.uid);
     }
     
     req.user = {
@@ -101,11 +83,8 @@ async function authenticateUser(req: AuthenticatedRequest, res: express.Response
       displayName: decodedToken.displayName
     };
     
-    console.log('Authentication successful, proceeding to next middleware');
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    
     // Enhanced error response for mobile debugging
     const errorResponse = {
       error: 'Invalid token',
@@ -281,13 +260,9 @@ app.get('/api/stats', authenticateUser, async (req: AuthenticatedRequest, res) =
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    console.log(`Fetching stats for user ${req.user.uid} (mobile: ${req.isMobile})`);
-    
     const startTime = Date.now();
     const stats = await db.getStats(req.user.uid);
     const duration = Date.now() - startTime;
-    
-    console.log(`Stats fetched successfully in ${duration}ms for user ${req.user.uid}`);
     
     // Add mobile-specific debugging info
     const response = {
@@ -302,8 +277,6 @@ app.get('/api/stats', authenticateUser, async (req: AuthenticatedRequest, res) =
     
     res.json(response);
   } catch (error) {
-    console.error('Error fetching stats:', error);
-    
     // Enhanced error response for mobile debugging
     const errorResponse = {
       error: 'Failed to fetch statistics',
@@ -341,7 +314,6 @@ app.get('/api/mobile-health', (req, res) => {
     }
   };
   
-  console.log('Mobile health check:', healthInfo);
   res.json(healthInfo);
 });
 
@@ -383,12 +355,6 @@ app.post('/api/import', authenticateUser, async (req: AuthenticatedRequest, res)
     }
     
     const data = req.body;
-    console.log('Import request data:', { 
-      hasCones: !!data.cones, 
-      conesLength: data.cones?.length,
-      dataKeys: Object.keys(data),
-      sampleCone: data.cones?.[0]
-    });
     
     // Validate import data structure
     if (!data.cones || !Array.isArray(data.cones)) {
@@ -396,10 +362,8 @@ app.post('/api/import', authenticateUser, async (req: AuthenticatedRequest, res)
     }
     
     const result = await db.importData(req.user.uid, data);
-    console.log('Import result:', result);
     res.json(result);
   } catch (error) {
-    console.error('Import endpoint error:', error);
     res.status(500).json({ error: 'Failed to import data', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
@@ -434,7 +398,6 @@ app.get('/api/firebase-config', (req, res) => {
   const missingVars = Object.entries(config).filter(([key, value]) => !value);
   
   if (missingVars.length > 0) {
-    console.error('Missing Firebase config variables:', missingVars.map(([key]) => key));
     return res.status(500).json({ 
       error: 'Firebase configuration incomplete',
       missing: missingVars.map(([key]) => key)
@@ -457,7 +420,6 @@ app.get('/api/auth-test', authenticateUser, (req: AuthenticatedRequest, res) => 
       message: 'Authentication successful'
     });
   } catch (error) {
-    console.error('Auth test error:', error);
     res.status(500).json({ error: 'Auth test failed' });
   }
 });
@@ -469,19 +431,16 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
   await db.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('Shutting down gracefully...');
   await db.close();
   process.exit(0);
 });
@@ -489,6 +448,4 @@ process.on('SIGTERM', async () => {
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cone Counter server running on port ${PORT}`);
-  console.log(`Network accessible at http://0.0.0.0:${PORT}`);
-  console.log(`Firebase Firestore database initialized`);
 });

@@ -10,11 +10,12 @@ const getFirebaseConfig = async () => {
 
   // Try to fetch from backend API (for Docker deployment)
   try {
-    console.log('Attempting to fetch Firebase config from backend...');
+    // Use the correct backend URL - in development, backend is on port 3000
+    const backendUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000' 
+      : window.location.origin;
     
-    // Use a more robust URL construction for mobile
-    const baseUrl = window.location.origin;
-    const response = await fetch(`${baseUrl}/api/firebase-config`, {
+    const response = await fetch(`${backendUrl}/api/firebase-config`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -22,7 +23,6 @@ const getFirebaseConfig = async () => {
       }
     });
     
-    console.log('Firebase config response status:', response.status);
     if (response.ok) {
       const config = await response.json();
       console.log('Firebase config received from backend (projectId:', config.projectId, ')');
@@ -38,13 +38,19 @@ const getFirebaseConfig = async () => {
       }
       return config;
     } else {
-      console.error('Firebase config response not ok:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('Error response:', errorText);
+      // Only log error if it's not a 500 (which means missing env vars)
+      if (response.status !== 500) {
+        console.error('Firebase config response not ok:', response.status, response.statusText);
+      }
     }
   } catch (error) {
-    console.error('Could not fetch Firebase config from backend:', error);
-    console.log('Falling back to build-time config');
+    // Only log if it's not a network error (which is expected in dev)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      // This is expected in development when backend isn't running
+      // Silently fall back to build-time config
+    } else {
+      console.error('Could not fetch Firebase config from backend:', error);
+    }
   }
 
   // Fall back to build-time environment variables
@@ -57,7 +63,6 @@ const getFirebaseConfig = async () => {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
   };
   
-  console.log('Using build-time Firebase config (projectId:', buildTimeConfig.projectId, ')');
   return buildTimeConfig;
 };
 
@@ -84,8 +89,6 @@ const initializeFirebase = async (retryCount = 0): Promise<{ app: any; auth: any
     const missingVars = requiredEnvVars.filter(key => !firebaseConfig[key as keyof typeof firebaseConfig]);
 
     if (missingVars.length > 0) {
-      console.error('Missing Firebase environment variables:', missingVars);
-      console.error('Please check your environment configuration');
       throw new Error(`Missing Firebase configuration: ${missingVars.join(', ')}`);
     }
 
@@ -98,14 +101,12 @@ const initializeFirebase = async (retryCount = 0): Promise<{ app: any; auth: any
     // Create Google Auth Provider
     googleProvider = new GoogleAuthProvider();
 
-    console.log('Firebase initialized successfully');
     return { app, auth, googleProvider };
   } catch (error) {
     console.error('Firebase initialization failed:', error);
     
     // Retry logic for mobile devices
     if (retryCount < 3) {
-      console.log(`Firebase init failed, retrying... (${retryCount + 1}/3)`);
       await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
       return initializeFirebase(retryCount + 1);
     }
@@ -121,7 +122,6 @@ export const getGoogleProvider = () => googleProvider;
 
 // Initialize Firebase immediately with better error handling
 const initPromise = initializeFirebase().catch(error => {
-  console.error('Failed to initialize Firebase:', error);
   // Don't throw here, let the app handle the error gracefully
 });
 

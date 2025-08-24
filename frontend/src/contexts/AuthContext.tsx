@@ -65,7 +65,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Retry after a delay for mobile devices
         setTimeout(() => {
           if (!firebaseReady) {
-            console.log('Retrying Firebase initialization...');
             checkFirebase();
           }
         }, 2000);
@@ -107,7 +106,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? `User ${user.uid} signed in` : 'User signed out');
+      if (user) {
+        console.log('User signed in:', user.uid);
+      } else {
+        console.log('User signed out');
+      }
       setCurrentUser(user);
       setLoading(false);
     }, (error) => {
@@ -116,7 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     return unsubscribe;
-  }, [firebaseReady]);
+  }, [firebaseReady]); // Only depend on firebaseReady, not recreate listener on every render
 
   // Show error state if Firebase fails to initialize
   if (initError && !firebaseReady) {

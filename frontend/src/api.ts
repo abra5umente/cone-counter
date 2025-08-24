@@ -32,7 +32,6 @@ async function getAuthHeaders(retryCount = 0): Promise<HeadersInit> {
       token = await user.getIdToken(true); // Force refresh for mobile reliability
     } catch (tokenError) {
       if (retryCount < 3) {
-        console.log(`Token refresh failed, retrying... (${retryCount + 1}/3)`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
         return getAuthHeaders(retryCount + 1);
       }
@@ -58,7 +57,6 @@ async function fetchWithRetry(url: string, options: RequestInit, retryCount = 0)
     
     // If we get a 401, try refreshing the token once
     if (response.status === 401 && retryCount === 0) {
-      console.log('Got 401, refreshing token and retrying...');
       const newHeaders = await getAuthHeaders(1);
       const newOptions = { ...options, headers: newHeaders };
       return fetchWithRetry(url, newOptions, retryCount + 1);
@@ -67,7 +65,6 @@ async function fetchWithRetry(url: string, options: RequestInit, retryCount = 0)
     return response;
   } catch (error) {
     if (retryCount < 2) {
-      console.log(`Network error, retrying... (${retryCount + 1}/3)`);
       await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
       return fetchWithRetry(url, options, retryCount + 1);
     }
@@ -78,10 +75,9 @@ async function fetchWithRetry(url: string, options: RequestInit, retryCount = 0)
 export class ConeAPI {
   static async getAllCones(): Promise<Cone[]> {
     const url = `${getAPIBase()}/api/cones`;
-    console.log('Fetching cones from:', url);
+    const headers = await getAuthHeaders();
     
     try {
-      const headers = await getAuthHeaders();
       const response = await fetchWithRetry(url, { headers });
       
       if (!response.ok) {
@@ -190,13 +186,10 @@ export class ConeAPI {
 
   static async getStats(): Promise<ConeStats> {
     const url = `${getAPIBase()}/api/stats`;
-    console.log('Fetching stats from:', url);
     
     try {
       const headers = await getAuthHeaders();
       const response = await fetchWithRetry(url, { headers });
-      
-      console.log('Stats response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -205,7 +198,6 @@ export class ConeAPI {
       }
       
       const stats = await response.json();
-      console.log('Stats received:', stats);
       return stats;
     } catch (error) {
       console.error('Error in getStats:', error);
@@ -215,7 +207,6 @@ export class ConeAPI {
 
   static async getAnalysis(): Promise<TimeAnalysis> {
     const url = `${getAPIBase()}/api/analysis`;
-    console.log('Fetching analysis from:', url);
     
     try {
       const headers = await getAuthHeaders();

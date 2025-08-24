@@ -48,8 +48,6 @@ function AppContent() {
       setError(null);
       setIsLoading(true);
       
-      console.log('Fetching data...', { isRetry, retryCount });
-      
       const [conesData, statsData, analysisData] = await Promise.all([
         ConeAPI.getAllCones(),
         ConeAPI.getStats(),
@@ -61,11 +59,9 @@ function AppContent() {
       setAnalysis(analysisData);
       setRetryCount(0); // Reset retry count on success
       
-      console.log('Data fetched successfully:', {
-        cones: conesData.length,
-        stats: statsData,
-        analysis: analysisData
-      });
+      if (isRetry) {
+        console.log('Data refresh successful after retry');
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -75,7 +71,6 @@ function AppContent() {
       if (!isRetry && retryCount < 3) {
         const nextRetryCount = retryCount + 1;
         setRetryCount(nextRetryCount);
-        console.log(`Auto-retrying data fetch in 2 seconds... (${nextRetryCount}/3)`);
         
         setTimeout(() => {
           fetchData(true);
@@ -92,8 +87,19 @@ function AppContent() {
   };
 
   useEffect(() => {
+    // Only fetch data once when component mounts
     fetchData();
-  }, []);
+  }, []); // Empty dependency array - only run once
+
+  // Add a separate effect to handle auth state changes
+  useEffect(() => {
+    // If user changes, we might want to refresh data
+    // But only if we already have data (not on initial load)
+    if (currentUser && cones.length > 0) {
+      // User changed, refresh data
+      fetchData();
+    }
+  }, [currentUser?.uid]); // Only depend on user ID, not the entire user object
 
   const toggleDark = () => {
     const next = !dark;

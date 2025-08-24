@@ -158,7 +158,6 @@ export class Database {
           };
         });
       } catch (orderByError) {
-        console.log('OrderBy query failed, falling back to simple query:', orderByError);
         // Fallback: get all cones and sort in memory
         const querySnapshot = await conesRef.where('userId', '==', userId).get();
         
@@ -180,7 +179,6 @@ export class Database {
         return cones.sort((a: Cone, b: Cone) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       }
     } catch (error) {
-      console.error('Error in getAllCones:', error);
       throw error;
     }
   }
@@ -211,7 +209,6 @@ export class Database {
           };
         });
       } catch (orderByError) {
-        console.log('OrderBy query failed in getConesByDateRange, falling back to simple query:', orderByError);
         // Fallback: get all cones and filter/sort in memory
         const querySnapshot = await conesRef
           .where('userId', '==', userId)
@@ -237,7 +234,6 @@ export class Database {
         return cones.sort((a: Cone, b: Cone) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       }
     } catch (error) {
-      console.error('Error in getConesByDateRange:', error);
       throw error;
     }
   }
@@ -258,7 +254,6 @@ export class Database {
         const firstDoc = querySnapshot.docs[0];
         return firstDoc.data().date;
       } catch (orderByError) {
-        console.log('OrderBy query failed in getMinDate, falling back to simple query:', orderByError);
         // Fallback: get all cones and find minimum date in memory
         const querySnapshot = await conesRef.where('userId', '==', userId).get();
         
@@ -275,7 +270,6 @@ export class Database {
         return minDate;
       }
     } catch (error) {
-      console.error('Error in getMinDate:', error);
       throw error;
     }
   }
@@ -330,7 +324,6 @@ export class Database {
         averagePerMonth
       };
     } catch (error) {
-      console.error('Error in getStats:', error);
       throw error;
     }
   }
@@ -377,7 +370,6 @@ export class Database {
       const querySnapshot = await q.get();
       return querySnapshot.size;
     } catch (error) {
-      console.error('Error in getCount:', error, { field1, op1, value1, field2, op2, value2 });
       throw error;
     }
   }
@@ -430,7 +422,6 @@ export class Database {
         importedCount
       };
     } catch (error) {
-      console.error('Error importing data:', error);
       return {
         success: false,
         message: `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
