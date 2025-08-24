@@ -1,4 +1,5 @@
 # Multi-stage build for production
+# Strategy: Install all dependencies for build, copy only built artifacts to final image
 FROM node:18-alpine AS base
 
 # Build the frontend
@@ -15,8 +16,8 @@ COPY frontend/index.html ./frontend/
 COPY frontend/src ./frontend/src
 COPY frontend/public ./frontend/public
 
-# Install frontend dependencies and build with Vite
-RUN cd frontend && npm ci --only=production && npm run build
+# Install frontend dependencies (including dev dependencies for build tools)
+RUN cd frontend && npm ci && npm run build
 
 # Build the backend
 FROM base AS backend-builder
@@ -27,8 +28,8 @@ COPY package*.json ./
 COPY tsconfig.json ./
 COPY src ./src
 
-# Install backend dependencies and compile TypeScript without npm scripts
-RUN npm ci --only=production && node node_modules/typescript/bin/tsc -p tsconfig.json
+# Install all dependencies (including dev dependencies for TypeScript compilation)
+RUN npm ci && node node_modules/typescript/bin/tsc -p tsconfig.json
 
 # Production image
 FROM base AS runner
