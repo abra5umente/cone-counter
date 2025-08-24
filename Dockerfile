@@ -16,7 +16,7 @@ COPY frontend/src ./frontend/src
 COPY frontend/public ./frontend/public
 
 # Install frontend dependencies and build with Vite
-RUN cd frontend && npm ci && npm run build
+RUN cd frontend && npm ci --only=production && npm run build
 
 # Build the backend
 FROM base AS backend-builder
@@ -28,7 +28,7 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # Install backend dependencies and compile TypeScript without npm scripts
-RUN npm ci && node node_modules/typescript/bin/tsc -p tsconfig.json
+RUN npm ci --only=production && node node_modules/typescript/bin/tsc -p tsconfig.json
 
 # Production image
 FROM base AS runner
@@ -66,12 +66,12 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose port
-EXPOSE 3000
+# Expose port for Cloud Run (8080)
+EXPOSE 8080
 
-# Health check
+# Health check for Cloud Run
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/stats', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:8080/api/stats', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Start the application
 ENTRYPOINT ["dumb-init", "--"]

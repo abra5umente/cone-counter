@@ -8,7 +8,7 @@ import { Cone, ImportResult } from './types';
 import { initializeFirebaseAdmin, verifyIdToken } from './firebase-admin';
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '8080', 10);
 
 // Debug: Log environment variables
 console.log('Environment variables loaded:');
