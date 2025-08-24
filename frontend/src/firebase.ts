@@ -15,7 +15,7 @@ const getFirebaseConfig = async () => {
     console.log('Firebase config response status:', response.status);
     if (response.ok) {
       const config = await response.json();
-      console.log('Firebase config received from backend:', config);
+      console.log('Firebase config received from backend (projectId:', config.projectId, ')');
       // Cache the config in window for future use
       if (typeof window !== 'undefined') {
         (window as any).__FIREBASE_CONFIG__ = config;
@@ -39,7 +39,7 @@ const getFirebaseConfig = async () => {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
   };
   
-  console.log('Using build-time Firebase config:', buildTimeConfig);
+  console.log('Using build-time Firebase config (projectId:', buildTimeConfig.projectId, ')');
   return buildTimeConfig;
 };
 

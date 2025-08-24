@@ -98,6 +98,17 @@ function formatDateTime(date: Date) {
 
 // API Routes
 
+// Health check endpoint (no authentication required)
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    firebaseProjectId: process.env.FIREBASE_PROJECT_ID ? 'SET' : 'MISSING',
+    firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL ? 'SET' : 'MISSING',
+    firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY ? 'SET (length: ' + process.env.FIREBASE_PRIVATE_KEY.length + ')' : 'MISSING'
+  });
+});
+
 // Get all cones for authenticated user
 app.get('/api/cones', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
@@ -337,6 +348,24 @@ app.get('/api/firebase-config', (req, res) => {
   }
   
   res.json(config);
+});
+
+// Debug endpoint to test authentication without database operations
+app.get('/api/auth-test', authenticateUser, (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    res.json({ 
+      success: true, 
+      user: req.user,
+      message: 'Authentication successful'
+    });
+  } catch (error) {
+    console.error('Auth test error:', error);
+    res.status(500).json({ error: 'Auth test failed' });
+  }
 });
 
 // Serve React app for all other routes
