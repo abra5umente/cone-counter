@@ -25,6 +25,14 @@ function initializeFirebaseAdmin() {
     console.log('FIREBASE_PRIVATE_KEY:', process.env.FIREBASE_PRIVATE_KEY ? 'SET (length: ' + process.env.FIREBASE_PRIVATE_KEY.length + ')' : 'MISSING');
 
     try {
+      console.log('Attempting to initialize Firebase Admin SDK...');
+      console.log('Service account details:', {
+        type: serviceAccount.type,
+        project_id: serviceAccount.project_id,
+        client_email: serviceAccount.client_email,
+        private_key_length: serviceAccount.private_key?.length || 0
+      });
+      
       initializeApp({
         credential: cert(serviceAccount as any),
         projectId: process.env.FIREBASE_PROJECT_ID
@@ -32,6 +40,10 @@ function initializeFirebaseAdmin() {
       console.log('Firebase Admin SDK initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Firebase Admin SDK:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       console.log('Using development mode without Firebase Admin SDK');
     }
   }
@@ -40,7 +52,9 @@ function initializeFirebaseAdmin() {
 // Verify Firebase ID token
 export async function verifyIdToken(idToken: string) {
   try {
+    console.log('Attempting to verify ID token, length:', idToken.length);
     const decodedToken = await getAuth().verifyIdToken(idToken);
+    console.log('Token verified successfully for user:', decodedToken.uid);
     return {
       uid: decodedToken.uid,
       email: decodedToken.email || '',
@@ -48,7 +62,12 @@ export async function verifyIdToken(idToken: string) {
     };
   } catch (error) {
     console.error('Token verification failed:', error);
-    throw new Error('Invalid token');
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any).code,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    throw new Error(`Invalid token: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
