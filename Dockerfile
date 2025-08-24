@@ -8,13 +8,15 @@ WORKDIR /app
 # Copy frontend source
 COPY frontend/package*.json ./frontend/
 COPY frontend/tsconfig.json ./frontend/
+COPY frontend/vite.config.ts ./frontend/
 COPY frontend/tailwind.config.js ./frontend/
 COPY frontend/postcss.config.js ./frontend/
+COPY frontend/index.html ./frontend/
 COPY frontend/src ./frontend/src
 COPY frontend/public ./frontend/public
 
-# Install frontend dependencies and build without npm scripts
-RUN cd frontend && npm ci && node node_modules/react-scripts/bin/react-scripts.js build
+# Install frontend dependencies and build with Vite
+RUN cd frontend && npm ci && npm run build
 
 # Build the backend
 FROM base AS backend-builder
@@ -43,16 +45,16 @@ COPY --from=backend-builder /app/dist ./dist
 COPY --from=backend-builder /app/node_modules ./node_modules
 COPY --from=backend-builder /app/package*.json ./
 
-# Copy built frontend
-COPY --from=frontend-builder /app/frontend/build ./frontend/build
+# Copy built frontend (Vite outputs to dist/ instead of build/)
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy icons provided by user into server root so they are served at /<name>.png
-COPY icons/android-chrome-192x192.png ./frontend/build/android-chrome-192x192.png
-COPY icons/android-chrome-512x512.png ./frontend/build/android-chrome-512x512.png
-COPY icons/apple-touch-icon.png ./frontend/build/apple-touch-icon.png
-COPY icons/favicon-16x16.png ./frontend/build/favicon-16x16.png
-COPY icons/favicon-32x32.png ./frontend/build/favicon-32x32.png
-COPY icons/favicon.ico ./frontend/build/favicon.ico
+COPY icons/android-chrome-192x192.png ./frontend/dist/android-chrome-192x192.png
+COPY icons/android-chrome-512x512.png ./frontend/dist/android-chrome-512x512.png
+COPY icons/apple-touch-icon.png ./frontend/dist/apple-touch-icon.png
+COPY icons/favicon-16x16.png ./frontend/dist/favicon-16x16.png
+COPY icons/favicon-32x32.png ./frontend/dist/favicon-32x32.png
+COPY icons/favicon.ico ./frontend/dist/favicon.ico
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs

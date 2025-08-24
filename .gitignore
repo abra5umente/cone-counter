@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 frontend/build/
+frontend/dist/
 
 # Environment variables
 .env

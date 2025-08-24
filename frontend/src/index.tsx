@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Initialize dark mode from localStorage
 const prefersDark = localStorage.getItem('theme') === 'dark';
@@ -14,7 +16,11 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <AuthProvider>
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    </AuthProvider>
   </React.StrictMode>
 );
 

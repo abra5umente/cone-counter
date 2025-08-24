@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BarChart3, Database, Home, Moon, Sun } from 'lucide-react';
+import { ChartNoAxesColumnIncreasing, Plus, Sunrise, History, CalendarDays, BarChart3, Database, Home, Moon, Sun, LogOut, User, Cannabis } from 'lucide-react';
 import { Cone, ConeStats, TimeAnalysis } from './types';
 import { ConeAPI } from './api';
+import { useAuth } from './contexts/AuthContext';
 import { StatsCard } from './components/StatsCard';
 import { AddConeModal } from './components/AddConeModal';
 import { ConeList } from './components/ConeList';
@@ -10,7 +11,7 @@ import { DataManagement } from './components/DataManagement';
 
 type Tab = 'dashboard' | 'analytics' | 'data';
 
-function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [cones, setCones] = useState<Cone[]>([]);
   const [stats, setStats] = useState<ConeStats | null>(null);
@@ -18,6 +19,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [dark, setDark] = useState<boolean>(document.documentElement.classList.contains('dark'));
+  
+  const { currentUser, logout } = useAuth();
 
   const fetchData = async () => {
     try {
@@ -53,6 +56,14 @@ function App() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to log out:', error);
+    }
+  };
+
   const handleConeAdded = () => {
     fetchData();
   };
@@ -84,12 +95,18 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-cone-green rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">🚬</span>
+                <Cannabis className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Cone Counter</h1>
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* User Info */}
+              <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <User className="w-4 h-4" />
+                <span>{currentUser?.displayName || currentUser?.email}</span>
+              </div>
+              
               <button
                 onClick={toggleDark}
                 className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -99,11 +116,11 @@ function App() {
               </button>
 
               <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 bg-cone-green text-white rounded-md hover:bg-cone-dark transition-colors cone-shadow"
+                onClick={handleLogout}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                title="Logout"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Cone
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -147,6 +164,15 @@ function App() {
               <Database className="w-4 h-4 inline mr-2" />
               Data Management
             </button>
+            
+            {/* Add Cone Button */}
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="ml-8 inline-flex items-center px-4 py-2 bg-cone-green text-white rounded-md hover:bg-green-600 transition-colors cone-shadow"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Cone
+            </button>
           </div>
         </div>
       </nav>
@@ -161,25 +187,25 @@ function App() {
                 <StatsCard
                   title="Total Cones"
                   value={stats.total}
-                  icon={Plus}
-                  color="border-l-cone-green"
+                  icon={ChartNoAxesColumnIncreasing}
+                  color="border-l-green-500"
                 />
                 <StatsCard
                   title="Today"
                   value={stats.today}
-                  icon={Plus}
+                  icon={Sunrise}
                   color="border-l-blue-500"
                 />
                 <StatsCard
                   title="This Week"
                   value={stats.thisWeek}
-                  icon={Plus}
+                  icon={History}
                   color="border-l-purple-500"
                 />
                 <StatsCard
                   title="This Month"
                   value={stats.thisMonth}
-                  icon={Plus}
+                  icon={CalendarDays}
                   color="border-l-orange-500"
                 />
               </div>
@@ -232,6 +258,14 @@ function App() {
         onClose={() => setIsAddModalOpen(false)}
         onConeAdded={handleConeAdded}
       />
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <AppContent />
     </div>
   );
 }

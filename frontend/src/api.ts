@@ -1,24 +1,54 @@
 import { Cone, ConeStats, TimeAnalysis, ExportData, ImportResult } from './types';
+import { auth } from './firebase';
 
-const API_BASE = process.env.REACT_APP_API_URL || '';
+// Dynamic API base that works from any device
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : `http://${window.location.hostname}:3000`;
+
+// Helper function to get auth headers
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  
+  // Get the Firebase ID token
+  const token = await user.getIdToken();
+  
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+}
 
 export class ConeAPI {
   static async getAllCones(): Promise<Cone[]> {
-    const response = await fetch(`${API_BASE}/api/cones`);
+    const url = `${API_BASE}/api/cones`;
+    console.log('Fetching cones from:', url);
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
+    console.log('Response status:', response.status);
     if (!response.ok) throw new Error('Failed to fetch cones');
     return response.json();
   }
 
   static async getCone(id: number): Promise<Cone> {
-    const response = await fetch(`${API_BASE}/api/cones/${id}`);
+    const url = `${API_BASE}/api/cones/${id}`;
+    console.log('Fetching cone from:', url);
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to fetch cone');
     return response.json();
   }
 
   static async addCone(timestamp?: string, notes?: string): Promise<Cone> {
-    const response = await fetch(`${API_BASE}/api/cones`, {
+    const url = `${API_BASE}/api/cones`;
+    console.log('Adding cone to:', url);
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ timestamp, notes })
     });
     if (!response.ok) throw new Error('Failed to add cone');
@@ -26,9 +56,11 @@ export class ConeAPI {
   }
 
   static async updateCone(id: number, updates: Partial<Cone>): Promise<Cone> {
-    const response = await fetch(`${API_BASE}/api/cones/${id}`, {
+    const url = `${API_BASE}/api/cones/${id}`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(updates)
     });
     if (!response.ok) throw new Error('Failed to update cone');
@@ -36,34 +68,48 @@ export class ConeAPI {
   }
 
   static async deleteCone(id: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/cones/${id}`, {
-      method: 'DELETE'
+    const url = `${API_BASE}/api/cones/${id}`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers
     });
     if (!response.ok) throw new Error('Failed to delete cone');
   }
 
   static async getStats(): Promise<ConeStats> {
-    const response = await fetch(`${API_BASE}/api/stats`);
+    const url = `${API_BASE}/api/stats`;
+    console.log('Fetching stats from:', url);
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
+    console.log('Stats response status:', response.status);
     if (!response.ok) throw new Error('Failed to fetch stats');
     return response.json();
   }
 
   static async getAnalysis(): Promise<TimeAnalysis> {
-    const response = await fetch(`${API_BASE}/api/analysis`);
+    const url = `${API_BASE}/api/analysis`;
+    console.log('Fetching analysis from:', url);
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to fetch analysis');
     return response.json();
   }
 
   static async exportData(): Promise<ExportData> {
-    const response = await fetch(`${API_BASE}/api/export`);
+    const url = `${API_BASE}/api/export`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to export data');
     return response.json();
   }
 
   static async importData(data: ExportData): Promise<ImportResult> {
-    const response = await fetch(`${API_BASE}/api/import`, {
+    const url = `${API_BASE}/api/import`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Failed to import data');
@@ -71,7 +117,9 @@ export class ConeAPI {
   }
 
   static async getConesByDateRange(startDate: string, endDate: string): Promise<Cone[]> {
-    const response = await fetch(`${API_BASE}/api/cones/range/${startDate}/${endDate}`);
+    const url = `${API_BASE}/api/cones/range/${startDate}/${endDate}`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to fetch cones by date range');
     return response.json();
   }
