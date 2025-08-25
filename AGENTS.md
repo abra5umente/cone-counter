@@ -13,13 +13,15 @@ This document is designed to help AI agents and developers understand the Cone C
 - **Cloud Storage**: Firebase Firestore database with automatic scaling and real-time sync
 - **User Authentication**: Secure Google Sign-in with Firebase Auth
 - **Timezone Aware**: Consistent local time handling across all displays and statistics
+- **Mobile Optimized**: Enhanced CORS and mobile device detection
+- **Cloud Run Ready**: Optimized for Google Cloud Run deployment
 
 ## Architecture Patterns
 
 ### Single Container Design
 The application uses a **single container architecture** where the Node.js backend serves both:
 - API endpoints under `/api/*`
-- Static frontend files from `frontend/build`
+- Static frontend files from `frontend/dist` (Vite build output)
 
 This design simplifies deployment and ensures consistency between frontend and backend.
 
@@ -101,10 +103,22 @@ frontend/src/
 │   ├── EditConeModal.tsx   # Edit existing cone
 │   ├── Analytics.tsx       # Charts and trends
 │   ├── DataManagement.tsx  # Import/export functionality
-│   └── StatsCard.tsx       # Statistics display
+│   ├── Login.tsx           # Authentication component
+│   ├── ProtectedRoute.tsx  # Route protection
+│   ├── StatsCard.tsx       # Statistics display
+│   └── MobileDebug.tsx     # Mobile device debugging
+├── contexts/
+│   └── AuthContext.tsx     # Firebase authentication context
 ├── api.ts             # API client functions
-└── types.ts           # Frontend type definitions
+├── firebase.ts        # Firebase client configuration
+├── types.ts           # Frontend type definitions
+└── index.tsx          # Application entry point
 ```
+
+### Build System
+- **Frontend**: Vite with React and TypeScript
+- **Backend**: TypeScript compilation with ts-node for development
+- **Output**: Frontend builds to `frontend/dist`, backend to `dist/`
 
 ## Key Development Patterns
 
@@ -118,6 +132,7 @@ frontend/src/
 - Hooks for state management (`useState`, `useEffect`)
 - Props interfaces for component contracts
 - Dark mode support via Tailwind `dark:` modifiers
+- Context API for authentication state
 
 ### 3. Database Patterns
 - Firestore security rules for data protection
@@ -130,7 +145,8 @@ frontend/src/
 - RESTful endpoints under `/api/*`
 - Consistent error handling with descriptive messages
 - JSON responses with proper HTTP status codes
-- CORS enabled for development flexibility
+- Enhanced CORS for mobile device compatibility
+- Mobile detection middleware for debugging
 
 ## Common Pitfalls & Solutions
 
@@ -145,14 +161,19 @@ frontend/src/
 **Prevention**: Check Firebase Admin SDK initialization in `firebase-admin.ts`
 
 ### 3. Build Failures
-**Problem**: Frontend build errors
-**Solution**: Clear `node_modules` and reinstall dependencies
-**Prevention**: Keep dependencies up to date
+**Problem**: Frontend build errors with Vite
+**Solution**: Clear `node_modules` and reinstall dependencies, check Vite configuration
+**Prevention**: Keep dependencies up to date, verify Vite config compatibility
 
 ### 4. Docker Issues
 **Problem**: Container won't start or Firebase credentials not loading
 **Solution**: Check environment variables and Firebase configuration
 **Prevention**: Ensure `.env` file is properly formatted and Firebase project is set up
+
+### 5. Port Configuration
+**Problem**: Application not accessible on expected port
+**Solution**: Default port is now 8080 for Cloud Run compatibility
+**Prevention**: Check `PORT` environment variable and Docker port mappings
 
 ## Testing Strategies
 
@@ -165,20 +186,22 @@ frontend/src/
 - [ ] Export and import data
 - [ ] Test dark mode toggle
 - [ ] Verify responsive design on mobile
+- [ ] Test authentication flow
+- [ ] Verify mobile device detection
 
 ### Automated Testing
 ```bash
 # Backend testing
-npm run dev  # Start backend
-curl http://localhost:3000/api/stats  # Test health
+npm run dev:backend  # Start backend only
+curl http://localhost:8080/api/stats  # Test health
 
 # Frontend testing
-cd frontend && npm start  # Start frontend
-# Test in browser at http://localhost:3001
+cd frontend && npm run dev  # Start Vite dev server
+# Test in browser at http://localhost:5173
 
 # Full stack testing
 docker build -t cone-counter:test .
-docker run -d -p 3000:3000 cone-counter:test
+docker run -d -p 8080:8080 cone-counter:test
 ```
 
 ## Development Workflow
@@ -197,6 +220,7 @@ docker run -d -p 3000:3000 cone-counter:test
 - [ ] React components follow functional patterns
 - [ ] Error handling is comprehensive
 - [ ] Tests cover edge cases
+- [ ] Mobile compatibility considered
 
 ## Key Files to Study
 
@@ -204,12 +228,16 @@ docker run -d -p 3000:3000 cone-counter:test
 1. **`src/server.ts`** - API endpoints and timezone logic
 2. **`src/database.ts`** - Database operations and schema
 3. **`src/types.ts`** - Backend type definitions
+4. **`src/firebase-admin.ts`** - Firebase Admin SDK setup
 
 ### For Frontend Changes
 1. **`frontend/src/App.tsx`** - Main application structure
 2. **`frontend/src/components/`** - UI component patterns
 3. **`frontend/src/api.ts`** - API client implementation
-4. **`frontend/src/types.ts`** - Frontend type definitions
+4. **`frontend/src/contexts/AuthContext.tsx`** - Authentication logic
+5. **`frontend/src/firebase.ts`** - Firebase client configuration
+6. **`frontend/src/types.ts`** - Frontend type definitions
+7. **`frontend/vite.config.ts`** - Vite configuration
 
 ### For Database Changes
 1. **`src/database.ts`** - Firestore operations and data normalization
@@ -230,6 +258,7 @@ docker run -d -p 3000:3000 cone-counter:test
 - Log errors appropriately
 - Return proper HTTP status codes
 - Handle edge cases gracefully
+- Provide mobile-friendly error responses
 
 ### 3. Performance
 - Use Firestore composite indexes for complex queries
@@ -244,6 +273,12 @@ docker run -d -p 3000:3000 cone-counter:test
 - Use Firebase Auth for user authentication
 - Never commit service account keys to version control
 
+### 5. Mobile Optimization
+- Test responsive design on various screen sizes
+- Ensure touch-friendly interface elements
+- Optimize for mobile data usage
+- Provide mobile-specific error messages
+
 ## Deployment Considerations
 
 ### Docker Commands
@@ -252,15 +287,15 @@ docker run -d -p 3000:3000 cone-counter:test
 docker build -t alexschladetsch/cone-counter:latest .
 docker-compose up -d
 
-# Health check
-curl http://localhost:3000/api/stats
+# Health check (note: port 8080)
+curl http://localhost:8080/api/stats
 
 # View logs
-docker logs cone-counter
+docker logs cone-counter-app
 ```
 
 ### Environment Variables
-- `PORT`: Server port (default: 3000)
+- `PORT`: Server port (default: 8080 for Cloud Run)
 - `NODE_ENV`: Environment mode (default: production)
 - `FIREBASE_PROJECT_ID`: Firebase project ID
 - `FIREBASE_PRIVATE_KEY`: Service account private key
@@ -273,6 +308,12 @@ docker logs cone-counter
 - Backup strategy: export via `/api/export` endpoint
 - Data is automatically replicated across Firebase infrastructure
 
+### Cloud Run Deployment
+- Optimized for Google Cloud Run
+- Health check endpoint: `/api/stats`
+- Port 8080 for Cloud Run compatibility
+- Multi-stage Docker build for efficiency
+
 ## Contributing Guidelines
 
 ### Code Style
@@ -280,12 +321,15 @@ docker logs cone-counter
 - Keep functions focused and single-purpose
 - Add comments for complex logic
 - Follow existing patterns in the codebase
+- Consider mobile device compatibility
 
 ### Testing Requirements
 - Test timezone edge cases
 - Verify database operations
 - Check responsive design
 - Test dark mode functionality
+- Verify mobile device detection
+- Test authentication flows
 
 ### Documentation
 - Update relevant documentation files
@@ -296,10 +340,10 @@ docker logs cone-counter
 ## Getting Help
 
 ### When You're Stuck
-1. **Check the Documentation**: README.md, API.md, DEPLOYMENT.md
+1. **Check the Documentation**: README.md, API.md, DEPLOYMENT.md, FIREBASE_SETUP.md
 2. **Study Existing Code**: Look for similar patterns
 3. **Test Incrementally**: Make small changes and test
-4. **Check Logs**: Use `docker logs cone-counter` for backend issues
+4. **Check Logs**: Use `docker logs cone-counter-app` for backend issues
 
 ### Common Questions
 - **Q**: Why are dates showing the wrong day?
@@ -313,6 +357,15 @@ docker logs cone-counter
 
 - **Q**: How do I set up Firebase for development?
 - **A**: Create Firebase project, enable Firestore and Auth, generate service account key, configure environment variables
+
+- **Q**: Why is the app running on port 8080 instead of 3000?
+- **A**: Port 8080 is the default for Google Cloud Run compatibility
+
+- **Q**: How do I test mobile device detection?
+- **A**: Use browser dev tools to simulate mobile devices or test on actual mobile devices
+
+- **Q**: What's the difference between `frontend/build` and `frontend/dist`?
+- **A**: The project now uses Vite which outputs to `dist/` instead of Create React App's `build/` directory
 
 ---
 
