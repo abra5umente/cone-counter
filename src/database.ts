@@ -1,4 +1,5 @@
 import { getFirestore } from 'firebase-admin/firestore';
+import { differenceInCalendarWeeks, differenceInCalendarMonths } from 'date-fns';
 import { Cone, ConeStats, TimeAnalysis, ExportData } from './types';
 
 export class Database {
@@ -306,8 +307,8 @@ export class Database {
       if (minDateStr && total > 0) {
         const startDate = new Date(minDateStr);
         const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const weeksDiff = Math.max(1, Math.ceil(daysDiff / 7));
-        const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
+        const weeksDiff = Math.max(1, differenceInCalendarWeeks(now, startDate) + 1);
+        const monthsDiff = Math.max(1, differenceInCalendarMonths(now, startDate) + 1);
 
         averagePerDay = total / daysDiff;
         averagePerWeek = total / weeksDiff;
