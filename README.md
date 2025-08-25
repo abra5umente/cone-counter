@@ -54,16 +54,6 @@ Exporting data:
 2. **Export**: Download your data as a JSON file
 3. **Import**: Upload a previously exported file (replaces all data)
 
-## Timezone Handling
-
-The application ensures consistent local time display:
-
-- **Storage**: All timestamps stored as ISO strings in UTC
-- **Display**: Dates and times shown in local timezone
-- **Derived Fields**: `date`, `time`, and `dayOfWeek` computed from local time
-- **Startup Normalization**: Existing data automatically corrected on container restart
-- **Statistics**: All calculations use local dates to prevent timezone-related discrepancies
-
 ## Quick Start
 
 ### Prerequisites

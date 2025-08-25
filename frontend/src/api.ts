@@ -5,7 +5,7 @@ import { getFirebaseAuth } from './firebase';
 const getAPIBase = () => {
   // If we're in development (localhost), use the dev server
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:3000';
+    return 'http://localhost:8080';
   }
   
   // For production, use the same origin as the current page

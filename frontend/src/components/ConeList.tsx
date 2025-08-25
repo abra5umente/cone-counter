@@ -64,7 +64,7 @@ export const ConeList: React.FC<ConeListProps> = ({ cones, onConesChanged }) => 
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-300">
                       <Clock className="w-4 h-4" />
-                      <span>{cone.time}</span>
+                      <span>{new Date(cone.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                     <span className="text-sm text-gray-400">•</span>
                     <span className="text-sm font-medium text-gray-700 dark:text-white">{cone.dayOfWeek}</span>
